@@ -1,0 +1,15 @@
+{
+  "name": "goal-decomposer-app",
+  "version": "0.1.0",
+  "description": "Prototype web app: user enters a goal, backend decomposes it into sub-goals (neural model pluggable).",
+  "private": true,
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "NODE_ENV=production node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
+
