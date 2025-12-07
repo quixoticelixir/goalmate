@@ -6,10 +6,11 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const { decomposeGoal } = require('./services/goalDecomposer');
 const {
+  db,
   createUser,
   findUserByEmail,
   findUserById,
-  insertGoalSession,
+  insertGoalSessionWithSubgoals,
   getGoalHistoryForUser
 } = require('./db');
 
@@ -114,6 +115,78 @@ app.get('/api/auth/me', (req, res) => {
   return res.json({ user: sanitizeUser(user) });
 });
 
+app.listen(PORT, () => {
+  console.log(`Server listening on http://localhost:${PORT}`);
+});
+
+// Валидация ISO 8601 даты (упрощённо)
+function isValidISODate(str) {
+  if (!str) return true;
+  const date = new Date(str);
+  return !isNaN(date.getTime()) && str === date.toISOString();
+}
+
+app.patch('/api/subgoals/:id', async (req, res) => {
+  console.log('📥 PATCH /api/subgoals/:id — входящий запрос');
+  console.log('  User ID from session:', req.session?.userId);
+  console.log('  Subgoal ID:', req.params.id);
+  console.log('  Request body:', req.body);
+
+  if (!req.session?.userId) {
+    console.log('  ❌ Отклонено: пользователь не авторизован');
+    return res.status(401).json({ error: 'Not authenticated.' });
+  }
+
+  const { id } = req.params;
+  const { title, deadline } = req.body;
+
+  if (title !== undefined && (typeof title !== 'string' || !title.trim())) {
+    console.log('  ❌ Отклонено: некорректный title');
+    return res.status(400).json({ error: 'Title must be a non-empty string.' });
+  }
+
+  if (deadline !== undefined && !isValidISODate(deadline)) {
+    console.log('  ❌ Отклонено: некорректный deadline');
+    return res.status(400).json({ error: 'Deadline must be a valid ISO 8601 datetime or null.' });
+  }
+
+  const subgoal = db
+    .prepare(`
+      SELECT s.id, gs.user_id
+      FROM subgoals s
+      JOIN goal_sessions gs ON s.goal_session_id = gs.id
+      WHERE s.id = ? AND (gs.user_id = ? OR gs.user_id IS NULL)
+    `)
+    .get(id, req.session.userId);
+
+  if (!subgoal) {
+    console.log('  ❌ Отклонено: подзадача не найдена или доступ запрещён');
+    return res.status(404).json({ error: 'Subgoal not found or access denied.' });
+  }
+
+  console.log('  ✅ Найдена подзадача, обновляем...');
+  const stmt = db.prepare(`
+    UPDATE subgoals
+    SET title = COALESCE(?, title),
+        deadline = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const updatedTitle = title?.trim() ?? null;
+  const result = stmt.run(updatedTitle, deadline || null, id);
+
+  console.log('  ✅ Обновлено строк:', result.changes);
+
+  const updated = db
+    .prepare('SELECT id, goal_session_id, title, deadline, is_completed, created_at, updated_at FROM subgoals WHERE id = ?')
+    .get(id);
+
+  console.log('  📤 Отправляем обновлённую подзадачу:', updated);
+  return res.json({ subgoal: updated });
+});
+
+// === ОБНОВЛЁННЫЙ РОУТ: декомпозиция ===
 app.post('/api/goals/decompose', async (req, res) => {
   try {
     if (!req.session || !req.session.userId) {
@@ -121,7 +194,6 @@ app.post('/api/goals/decompose', async (req, res) => {
     }
 
     const { goal } = req.body || {};
-
     if (!goal || typeof goal !== 'string' || !goal.trim()) {
       return res.status(400).json({ error: 'Goal is required and must be a non-empty string.' });
     }
@@ -129,21 +201,21 @@ app.post('/api/goals/decompose', async (req, res) => {
     const trimmedGoal = goal.trim();
     const result = await decomposeGoal(trimmedGoal);
 
-    try {
-      insertGoalSession(
-        req.session?.userId || null,
-        trimmedGoal,
-        JSON.stringify(result.subgoals || []),
-        JSON.stringify(result.meta || {})
-      );
-    } catch (error) {
-      console.error('Failed to save goal session:', error);
-      return res.status(500).json({ error: 'Failed to save goal session.' });
+    if (!Array.isArray(result.subgoals) || result.subgoals.length === 0) {
+      return res.status(400).json({ error: 'No subgoals generated.' });
     }
 
+    const { sessionId, subgoals } = insertGoalSessionWithSubgoals(
+      req.session.userId,
+      trimmedGoal,
+      result.subgoals,
+      result.meta
+    );
+
     return res.json({
+      id: sessionId,
       goal: trimmedGoal,
-      subgoals: result.subgoals,
+      subgoals,
       meta: result.meta
     });
   } catch (error) {
@@ -152,6 +224,7 @@ app.post('/api/goals/decompose', async (req, res) => {
   }
 });
 
+// === ОБНОВЛЁННЫЙ РОУТ: история ===
 app.get('/api/goals/history', (req, res) => {
   if (!req.session || !req.session.userId) {
     return res.status(401).json({ error: 'Not authenticated.' });
@@ -164,8 +237,4 @@ app.get('/api/goals/history', (req, res) => {
     console.error('Error in /api/goals/history:', error);
     return res.status(500).json({ error: 'Failed to load history.' });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
 });

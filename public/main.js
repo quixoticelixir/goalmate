@@ -63,11 +63,119 @@ function renderResult(data) {
   outputGoalText.textContent = data.goal;
   subgoalList.innerHTML = '';
 
-  (data.subgoals || []).forEach((text) => {
-    const li = document.createElement('li');
-    li.textContent = text;
-    subgoalList.appendChild(li);
+  (data.subgoals || []).forEach((sg) => {
+    // Здесь предполагается, что sg — объект с полями id, title, deadline
+    // Если на первом шаге у тебя нет id — временно используй индекс
+    const subgoalId = sg.id || `temp-${Date.now()}-${Math.random()}`;
+    const editableEl = makeEditableSubgoal(
+      sg.id, // ← теперь всегда есть id, временных нет
+      sg.title,
+      sg.deadline,
+      async (id, updates) => {
+        const res = await fetch(`/api/subgoals/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(updates)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to update subgoal');
+        }
+        // Опционально: можно обновить только этот элемент, но проще перезагрузить историю
+      }
+    );
+    subgoalList.appendChild(editableEl);
   });
+}
+
+function makeEditableSubgoal(subgoalId, initialTitle, deadline, onSave) {
+  const container = document.createElement('div');
+  container.className = 'editable-subgoal';
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+  container.style.gap = '8px';
+  container.style.padding = '4px 0';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.value = initialTitle;
+  titleInput.style.flex = '1';
+  titleInput.style.padding = '6px 8px';
+  titleInput.style.borderRadius = '6px';
+  titleInput.style.border = '1px solid #111827';
+  titleInput.style.background = '#020617';
+  titleInput.style.color = '#e5e7eb';
+  titleInput.style.fontSize = '13px';
+
+  const deadlineInput = document.createElement('input');
+  deadlineInput.type = 'datetime-local';
+  deadlineInput.style.width = '180px';
+  deadlineInput.style.fontSize = '13px';
+  deadlineInput.style.padding = '6px';
+  deadlineInput.style.borderRadius = '6px';
+  deadlineInput.style.border = '1px solid #111827';
+  deadlineInput.style.background = '#020617';
+  deadlineInput.style.color = '#e5e7eb';
+  if (deadline) {
+    const dt = new Date(deadline);
+    if (!isNaN(dt.getTime())) {
+      deadlineInput.value = dt.toISOString().slice(0, 16);
+    }
+  }
+
+  const statusEl = document.createElement('span');
+  statusEl.style.minWidth = '20px';
+  statusEl.style.textAlign = 'center';
+  statusEl.style.fontSize = '14px';
+  statusEl.style.color = '#94a3b8';
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = '💾';
+  saveBtn.style.padding = '4px 8px';
+  saveBtn.style.borderRadius = '6px';
+  saveBtn.style.background = '#1e293b';
+  saveBtn.style.color = '#94a3b8';
+  saveBtn.style.border = '1px solid #1f2937';
+  saveBtn.style.cursor = 'pointer';
+
+  saveBtn.addEventListener('click', async () => {
+    const newTitle = titleInput.value.trim();
+    const newDeadline = deadlineInput.value
+      ? new Date(deadlineInput.value).toISOString()
+      : null;
+
+    if (!newTitle) {
+      alert('Title cannot be empty.');
+      return;
+    }
+
+    statusEl.textContent = '⏳';
+    statusEl.style.color = '#facc15';
+
+    try {
+      await onSave(subgoalId, { title: newTitle, deadline: newDeadline });
+      statusEl.textContent = '✅';
+      statusEl.style.color = '#34d399';
+      setTimeout(() => {
+        statusEl.textContent = '';
+      }, 1500);
+    } catch (err) {
+      statusEl.textContent = '❌';
+      statusEl.style.color = '#f87171';
+      setTimeout(() => {
+        statusEl.textContent = '💾';
+      }, 2000);
+      console.error('Save error:', err);
+    }
+  });
+
+  container.appendChild(titleInput);
+  container.appendChild(deadlineInput);
+  container.appendChild(saveBtn);
+  container.appendChild(statusEl);
+
+  return container;
 }
 
 function renderHistory(items) {
@@ -99,9 +207,32 @@ function renderHistory(items) {
 
     if (Array.isArray(item.subgoals) && item.subgoals.length > 0) {
       const ul = document.createElement('ul');
+      ul.style.listStyle = 'none';
+      ul.style.paddingLeft = '0';
+      ul.style.margin = '6px 0 0';
+
       item.subgoals.forEach((sg) => {
+        const editableEl = makeEditableSubgoal(
+          sg.id,
+          sg.title,
+          sg.deadline,
+          async (id, updates) => {
+            const res = await fetch(`/api/subgoals/${id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify(updates)
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || 'Failed to update subgoal');
+            }
+            await loadHistory(); // обязательно — чтобы обновить дедлайны и порядок
+          }
+        );
         const liSub = document.createElement('li');
-        liSub.textContent = sg;
+        liSub.style.padding = '4px 0';
+        liSub.appendChild(editableEl);
         ul.appendChild(liSub);
       });
       li.appendChild(ul);
