@@ -1,421 +1,857 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Goal Decomposer • Prototype</title>
+  <title>GoalMate - Трекер целей и привычек</title>
   <style>
     :root {
       --bg: #020617;
       --card: #020617;
       --accent: #38bdf8;
       --accent-strong: #0ea5e9;
-      --accent-soft: rgba(56, 189, 248, 0.2);
       --text: #e5e7eb;
       --muted: #94a3b8;
       --border: #1f2937;
-      --error: #f97373;
+      --error: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --goal-color: #8b5cf6;
     }
-    * {
-      box-sizing: border-box;
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; color: var(--text); background: #000; }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 220px;
+      background: rgba(15, 23, 42, 0.95);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
     }
-    body {
+    .sidebar h1 {
+      padding: 0 24px 24px;
+      font-size: 20px;
       margin: 0;
-      min-height: 100vh;
+      color: var(--accent);
+    }
+    .sidebar-item {
+      padding: 12px 24px;
+      color: var(--muted);
+      text-decoration: none;
       display: flex;
-      justify-content: center;
-      align-items: stretch;
-      padding: 24px 16px;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .sidebar-item:hover, .sidebar-item.active {
       color: var(--text);
-      background:
-        radial-gradient(circle at 0% 0%, #1e293b, transparent 55%),
-        radial-gradient(circle at 100% 0%, #0f172a, transparent 55%),
-        #000;
+      background: rgba(30, 64, 175, 0.5);
     }
-    .app {
-      width: min(900px, 100%);
-      margin: auto;
-      padding: 24px 22px 26px;
-      border-radius: 18px;
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
-        radial-gradient(circle at bottom right, rgba(129, 140, 248, 0.18), transparent 55%),
-        var(--card);
-      box-shadow:
-        0 25px 55px rgba(15, 23, 42, 0.9),
-        0 0 0 1px rgba(15, 23, 42, 0.9);
+    .sidebar-item.active {
+      border-left: 3px solid var(--accent);
     }
+    .main-content { flex: 1; padding: 24px; overflow-y: auto; }
     header {
       display: flex;
       justify-content: space-between;
-      gap: 10px;
       align-items: center;
-      margin-bottom: 18px;
-    }
-    h1 {
-      margin: 0 0 4px;
-      font-size: 24px;
-      letter-spacing: -0.03em;
-    }
-    header p {
-      margin: 0;
-      font-size: 14px;
-      color: var(--muted);
-    }
-    .chip {
-      font-size: 12px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(15, 23, 42, 0.9);
-      white-space: nowrap;
-    }
-    .chip span {
-      color: var(--accent);
-      font-weight: 600;
-    }
-    main {
-      display: grid;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
       gap: 16px;
     }
     .auth-card {
-      padding: 14px;
+      padding: 20px;
       border-radius: 14px;
       border: 1px solid var(--border);
       background: rgba(15, 23, 42, 0.9);
-      display: grid;
-      gap: 10px;
-    }
-    .auth-card h2 {
-      margin: 0;
-      font-size: 16px;
-      letter-spacing: -0.02em;
-    }
-    .auth-row {
-      display: grid;
-      gap: 6px;
-    }
-    .auth-controls {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .button-secondary {
-      background: #0f172a;
-      color: var(--text);
-      border: 1px solid var(--border);
-      box-shadow: none;
-    }
-    .button-secondary:hover {
-      box-shadow: none;
-      filter: brightness(1.05);
-    }
-    .button-secondary:active {
-      box-shadow: none;
-    }
-    .current-user {
-      margin: 0;
-      font-size: 13px;
-      color: var(--muted);
-    }
-    form {
-      padding: 14px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: rgba(15, 23, 42, 0.9);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    label {
-      font-size: 13px;
-      color: var(--muted);
-    }
-    input[type="email"],
-    input[type="password"] {
-      width: 100%;
-      padding: 10px 12px;
-      font-size: 14px;
-      border-radius: 10px;
-      border: 1px solid #111827;
-      background: #020617;
-      color: var(--text);
-      outline: none;
-      transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-    }
-    input::placeholder {
-      color: #4b5563;
-    }
-    input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-soft), 0 0 0 1px #020617;
-      background: #020617;
-    }
-    textarea {
-      width: 100%;
-      min-height: 80px;
-      resize: vertical;
-      padding: 11px 12px;
-      font-size: 14px;
-      border-radius: 10px;
-      border: 1px solid #111827;
-      background: #020617;
-      color: var(--text);
-      outline: none;
-      transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
-    }
-    textarea::placeholder {
-      color: #4b5563;
-    }
-    textarea:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px var(--accent-soft), 0 0 0 1px #020617;
-      background: #020617;
-    }
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .hint {
-      font-size: 12px;
-      color: var(--muted);
+      margin-bottom: 20px;
     }
     button {
-      padding: 9px 16px;
-      border-radius: 999px;
+      padding: 8px 16px;
+      border-radius: 8px;
       border: none;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
+      background: var(--accent);
       color: #020617;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+    .button-secondary {
+      background: #1e293b;
+      color: var(--text);
+    }
+    .button-goal {
+      background: var(--goal-color);
+      color: white;
+    }
+    .button-secondary:hover:not(:disabled) {
+      box-shadow: 0 4px 12px rgba(30, 41, 59, 0.3);
+    }
+    .habit-card, .goal-card, .subgoal-card {
+      background: rgba(15, 23, 42, 0.9);
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border);
+      transition: all 0.3s ease;
+    }
+    .habit-card:hover, .goal-card:hover, .subgoal-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+    .goal-card {
+      border-left: 4px solid var(--goal-color);
+    }
+    .subgoal-card {
+      margin-left: 20px;
+      border-left: 3px solid var(--accent);
+      background: rgba(30, 41, 59, 0.7);
+    }
+    .habit-title, .goal-title { 
+      font-size: 16px; 
+      margin: 0 0 8px; 
+      font-weight: 500; 
+    }
+    .goal-title {
+      color: var(--goal-color);
+    }
+    .subgoal-title {
+      font-size: 14px;
+      margin: 0 0 6px;
+      color: var(--accent);
+    }
+    .habit-stats, .goal-stats, .subgoal-stats { 
+      font-size: 13px; 
+      color: var(--muted); 
+      margin: 4px 0; 
+    }
+    .subgoal-stats {
+      font-size: 12px;
+    }
+    .empty-state { 
+      color: var(--muted); 
+      font-style: italic; 
+      margin: 20px 0; 
+      text-align: center; 
+      padding: 20px;
+      background: rgba(30, 41, 59, 0.3);
+      border-radius: 8px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #111827;
+      background: #020617;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: 2px solid var(--accent);
+      border-color: var(--accent);
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    
+    /* Календарь */
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 20px 0;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: 180px repeat(auto-fit, minmax(36px, 1fr));
+      gap: 2px;
+      overflow-x: auto;
+    }
+    .calendar-row {
+      display: contents;
+    }
+    .calendar-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
+      border-radius: 4px;
+      font-size: 10px;
+      background: transparent;
+    }
+    .calendar-cell.habit-label {
+      aspect-ratio: auto;
+      text-align: right;
+      font-weight: 500;
+      padding: 6px;
+      background: rgba(15, 23, 42, 0.8);
+      position: sticky;
+      left: 0;
+      z-index: 1;
+    }
+    .calendar-cell.day-header {
+      flex-direction: column;
+      background: transparent !important;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .calendar-cell.day-header .day-number { font-weight: bold; }
+    .calendar-cell.day-cell {
+      cursor: pointer;
+      background: #1f2937;
+      transition: background 0.2s;
+    }
+    .calendar-cell.day-cell:hover { background: #334155; }
+    .marker {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .marker.checked { background: var(--accent); }
+    .marker.today { border: 2px solid var(--accent); }
+    
+    /* Toast уведомления */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 10000;
+      animation: slideIn 0.3s ease-out;
+      max-width: 300px;
+    }
+    .toast.success { border-left: 4px solid var(--success); }
+    .toast.error { border-left: 4px solid var(--error); }
+    .toast.info { border-left: 4px solid var(--accent); }
+    .toast.warning { border-left: 4px solid var(--warning); }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    /* Спиннер и индикаторы */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--text);
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    .decompose-spinner {
+      width: 24px;
+      height: 24px;
+      border-width: 3px;
+      margin-right: 10px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Модалки */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      max-width: 500px;
+      width: 100%;
+      padding: 24px;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-wide {
+      max-width: 700px;
+    }
+    
+    /* Табы */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    
+    .tab {
+      padding: 10px 20px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    
+    .tab.active {
+      border-bottom-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    /* Прогресс */
+    .progress-container {
+      margin: 15px 0;
+    }
+    
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 5px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s ease;
+    }
+    
+    .progress-fill.goal {
+      background: var(--goal-color);
+    }
+    
+    /* Сложность */
+    .complexity-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+    
+    .complexity-easy {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+    
+    .complexity-medium {
+      background: rgba(234, 179, 8, 0.2);
+      color: #eab308;
+    }
+    
+    .complexity-hard {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    /* Формы и ошибки */
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .error-message {
+      color: var(--error);
+      font-size: 12px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .error-message::before {
+      content: "⚠";
+    }
+
+    /* Кнопки состояния */
+    .button-success {
+      background: var(--success) !important;
+      color: white !important;
+    }
+
+    .button-success:hover:not(:disabled) {
+      background: #059669 !important;
+    }
+
+    .button-warning {
+      background: var(--warning) !important;
+      color: #020617 !important;
+    }
+
+    /* AI секция */
+    .ai-plan {
+      background: rgba(139, 92, 246, 0.1);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+
+    .ai-plan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .ai-plan-title {
+      font-weight: 500;
+      color: var(--goal-color);
+    }
+
+    .subgoal-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 8px;
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 6px;
+    }
+
+    .subgoal-step-number {
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      color: #020617;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .subgoal-step-content {
+      flex: 1;
+    }
+
+    .subgoal-step-title {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+
+    .subgoal-step-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      gap: 12px;
+    }
+    
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      .app { flex-direction: column; }
+      .sidebar { width: 100%; height: auto; padding: 16px 0; }
+      .sidebar h1 { padding: 0 16px 16px; }
+      .sidebar-item { padding: 12px 16px; }
+      .main-content { padding: 16px; }
+      .calendar-grid { grid-template-columns: 120px repeat(auto-fit, minmax(32px, 1fr)); }
+      .calendar-cell.habit-label { font-size: 12px; }
+      header { flex-direction: column; align-items: flex-start; }
+      .modal-content { padding: 16px; }
+    }
+    
+    @media (max-width: 480px) {
+      .calendar-header { flex-direction: column; align-items: flex-start; }
+      .calendar-grid { grid-template-columns: 100px repeat(auto-fit, minmax(28px, 1fr)); }
+      .tabs { flex-direction: column; }
+      .tab { padding: 8px; }
+    }
+    
+    /* AI декомпозиция */
+    .decomposition-result {
+      background: rgba(30, 41, 59, 0.5);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      border: 1px solid var(--border);
+    }
+    
+    .subgoal-item {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border-left: 3px solid var(--accent);
+    }
+    
+    /* Дедлайны */
+    .deadline-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: radial-gradient(circle at 20% 0, #e0f2fe, #bae6fd 45%, #38bdf8);
-      box-shadow:
-        0 15px 32px rgba(56, 189, 248, 0.45),
-        0 0 0 1px rgba(8, 47, 73, 0.9);
-      transition: transform 0.08s ease-out, box-shadow 0.16s ease-out, filter 0.16s ease-out;
-    }
-    button:hover {
-      filter: brightness(1.05);
-      box-shadow:
-        0 20px 40px rgba(56, 189, 248, 0.56),
-        0 0 0 1px rgba(8, 47, 73, 1);
-      transform: translateY(-1px);
-    }
-    button:active {
-      transform: translateY(0);
-      box-shadow:
-        0 10px 24px rgba(56, 189, 248, 0.4),
-        0 0 0 1px rgba(8, 47, 73, 0.9);
-    }
-    button span.icon {
-      font-size: 15px;
-    }
-    .status {
-      min-height: 18px;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 12px;
       font-size: 12px;
-      color: var(--muted);
-      margin-top: 4px;
+      background: rgba(139, 92, 246, 0.2);
+      color: var(--goal-color);
+      margin-left: 8px;
     }
-    .status.error {
-      color: var(--error);
+    
+    /* Приоритет */
+    .priority-high {
+      color: #ef4444;
+      font-weight: bold;
     }
-    .status strong {
-      color: var(--accent);
+    
+    .priority-medium {
+      color: #f59e0b;
     }
-    .output {
-      padding: 14px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.1), transparent 60%), #020617;
+    
+    .priority-low {
+      color: #10b981;
     }
-    .output h2 {
-      margin: 0 0 10px;
-      font-size: 16px;
-      letter-spacing: -0.02em;
+    
+    /* Анимации */
+    .fade-in {
+      animation: fadeIn 0.5s ease-out;
     }
-    .history {
-      padding: 14px;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: rgba(15, 23, 42, 0.9);
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .history h2 {
-      margin: 0 0 8px;
-      font-size: 16px;
-      letter-spacing: -0.02em;
+    
+    .slide-down {
+      animation: slideDown 0.3s ease-out;
     }
-    .history-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: 8px;
-    }
-    .history-item {
-      padding: 9px 10px;
-      border-radius: 10px;
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(30, 64, 175, 0.9);
-    }
-    .history-item h3 {
-      margin: 0 0 4px;
-      font-size: 13px;
-      color: #e5e7eb;
-    }
-    .history-item time {
-      display: block;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .history-item ul {
-      margin: 6px 0 0;
-      padding-left: 16px;
-      color: #d1d5db;
-    }
-    .goal-text {
-      margin: 0 0 8px;
-      font-size: 14px;
-      color: #e5e7eb;
-      padding: 8px 10px;
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(30, 64, 175, 0.9);
-    }
-    .goal-text span {
-      color: var(--accent);
-    }
-    .subgoal-label {
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-    .subgoal-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: grid;
-      gap: 6px;
-    }
-    .subgoal-list li {
-      position: relative;
-      padding: 7px 9px 7px 20px;
-      font-size: 13px;
-      border-radius: 8px;
-      background: rgba(15, 23, 42, 0.95);
-      border: 1px solid rgba(30, 64, 175, 0.9);
-      color: #d1d5db;
-    }
-    .subgoal-list li::before {
-      content: "";
-      position: absolute;
-      left: 8px;
-      top: 50%;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      transform: translateY(-50%);
-      background: radial-gradient(circle, var(--accent-strong), var(--accent));
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
-    }
-    .empty-state {
-      font-size: 13px;
-      color: var(--muted);
-      font-style: italic;
-    }
-    @media (max-width: 640px) {
-      .app {
-        padding: 18px 14px 20px;
-      }
-      header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-      .controls {
-        align-items: flex-start;
-      }
+    
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <div>
-        <h1>Goal Decomposer</h1>
-        <p>Enter a goal, backend returns a list of sub-goals via API.</p>
-      </div>
-      <div class="chip">
-        Stack: <span>HTML + JS + Node/Express</span>
-      </div>
-    </header>
-
-    <main>
-      <section class="auth-card">
-        <h2>Account</h2>
-        <div class="auth-row">
-          <label for="auth-email">Email</label>
-          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email">
-        </div>
-        <div class="auth-row">
-          <label for="auth-password">Password</label>
-          <input type="password" id="auth-password" placeholder="•••••••" autocomplete="current-password">
-        </div>
-        <div class="auth-controls">
-          <button type="button" id="btn-register">
-            <span class="icon">✨</span>
-            Register
-          </button>
-          <button type="button" id="btn-login">
-            <span class="icon">🔑</span>
-            Login
-          </button>
-          <button type="button" id="btn-logout" class="button-secondary" style="display:none;">
-            <span class="icon">🚪</span>
-            Logout
-          </button>
-        </div>
-        <div id="auth-status" class="status"></div>
-        <p class="current-user">Current user: <span id="current-user">Guest</span></p>
-      </section>
-
-      <form id="goal-form">
-        <label for="goal-input">Goal</label>
-        <textarea id="goal-input" placeholder="Example: Learn React and build a personal portfolio website"></textarea>
-        <div class="controls">
-          <p class="hint">Frontend calls <code>/api/goals/decompose</code>. Backend can later connect to a real neural model.</p>
-          <button type="submit">
-            <span class="icon">⚡</span>
-            Decompose goal
-          </button>
-        </div>
-        <div id="status" class="status"></div>
-      </form>
-
-      <section class="output" aria-live="polite">
-        <h2>Decomposition</h2>
-        <p id="output-empty" class="empty-state">No decomposition yet. Enter a goal above and run the prototype.</p>
-        <p id="output-goal" class="goal-text" style="display:none;">
-          <span>Goal:</span> <span id="goal-text"></span>
-        </p>
-        <p id="subgoal-label" class="subgoal-label" style="display:none;">Suggested sub-goals:</p>
-        <ul id="subgoal-list" class="subgoal-list"></ul>
-      </section>
-
-      <section class="history" id="history-section" style="display:none;">
-        <h2>History (last 50)</h2>
-        <p id="history-empty" class="empty-state">No history yet.</p>
-        <ul id="history-list" class="history-list"></ul>
-      </section>
-    </main>
+  <!-- Экран авторизации -->
+  <div id="auth-screen" class="auth-card" style="width:100%;max-width:400px;margin:100px auto;">
+    <h1 style="text-align:center;margin-bottom:24px;">GoalMate</h1>
+    <input type="email" id="auth-email" placeholder="Email" required>
+    <input type="password" id="auth-password" placeholder="Пароль" required>
+    <button type="button" id="btn-login" style="width:100%;margin:10px 0;">
+      <span id="login-text">Войти</span>
+      <span id="login-spinner" class="spinner" style="display:none;"></span>
+    </button>
+    <button type="button" id="btn-register" style="width:100%;background:#1e293b;">
+      <span id="register-text">Регистрация</span>
+      <span id="register-spinner" class="spinner" style="display:none;"></span>
+    </button>
+    <div id="auth-status" style="margin-top:12px;color:var(--muted);text-align:center;min-height:20px;"></div>
   </div>
+
+  <!-- Основной интерфейс -->
+  <div id="app-content" style="display:none;">
+    <div class="app">
+      <!-- Боковое меню -->
+      <aside class="sidebar">
+        <h1>GoalMate</h1>
+        <div class="sidebar-item" data-page="home" role="button" tabindex="0">
+          <span>🏠</span> Главная
+        </div>
+        <div class="sidebar-item" data-page="goals" role="button" tabindex="0">
+          <span>🎯</span> Мои цели
+        </div>
+        <div class="sidebar-item" data-page="habits-tracker" role="button" tabindex="0">
+          <span>🔁</span> Трекер привычек
+        </div>
+        <div class="sidebar-item" data-page="logout" role="button" tabindex="0">
+          <span>🚪</span> Выйти
+        </div>
+      </aside>
+
+      <!-- Основной контент -->
+      <main class="main-content">
+        <header>
+          <div>
+            <h1 id="page-title">Главное меню</h1>
+            <div id="page-subtitle" style="color:var(--muted);font-size:14px;"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#020617;font-weight:bold;flex-shrink:0;">
+              <span id="user-initial">G</span>
+            </div>
+            <span id="user-email" style="font-size:14px;"></span>
+          </div>
+        </header>
+
+        <!-- Главное меню -->
+        <section id="page-home" style="display:block;">
+          <div class="auth-card" style="max-width:500px;">
+            <h2 style="margin-top:0;">Что хочешь сделать?</h2>
+            <button type="button" id="btn-goals" class="button-goal" style="width:100%;margin:10px 0;padding:12px;">
+              🎯 Поставить цель
+            </button>
+            <button type="button" id="btn-habits" style="width:100%;margin:10px 0;padding:12px;background:#1e293b;">
+              🔁 Управление привычками
+            </button>
+            <div id="quick-stats" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+              <h3 style="margin-top:0;font-size:16px;">Быстрая статистика</h3>
+              <div id="stats-content"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Раздел целей -->
+        <section id="page-goals" style="display:none;">
+          <div class="auth-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+              <h2 style="margin:0;">🎯 Мои цели</h2>
+              <button type="button" id="btn-add-goal" class="button-goal">
+                + Новая цель
+              </button>
+            </div>
+            
+            <div class="tabs">
+              <div class="tab active" data-tab="active-goals">Активные</div>
+              <div class="tab" data-tab="completed-goals">Завершенные</div>
+              <div class="tab" data-tab="archived-goals">Архив</div>
+            </div>
+            
+            <div id="goals-tab-content">
+              <div id="active-goals" class="tab-pane active">
+                <div id="goals-list-container"></div>
+              </div>
+              <div id="completed-goals" class="tab-pane" style="display:none;">
+                <div id="completed-goals-container"></div>
+              </div>
+              <div id="archived-goals" class="tab-pane" style="display:none;">
+                <div id="archived-goals-container"></div>
+              </div>
+            </div>
+            
+            <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+              <button type="button" id="btn-back-to-home-from-goals" class="button-secondary">
+                ← Назад
+              </button>
+              <button type="button" id="btn-refresh-goals" class="button-secondary">
+                ⟳ Обновить
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Панель привычек -->
+        <section id="page-habits-list" style="display:none;">
+          <div class="auth-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <h2 style="margin:0;">Мои привычки</h2>
+              <button type="button" id="btn-add-habit" class="button-secondary">
+                + Добавить привычку
+              </button>
+            </div>
+            <div id="habits-list-container"></div>
+            <div style="display:flex;gap:10px;margin-top:20px;">
+              <button type="button" id="btn-back-to-home" class="button-secondary" style="flex:1;">
+                ← Назад к выбору
+              </button>
+              <button type="button" id="btn-refresh-habits" class="button-secondary" style="flex:1;">
+                ⟳ Обновить
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Трекер привычек -->
+        <section id="page-habits-tracker" style="display:none;">
+          <div class="auth-card">
+            <h2 style="margin-top:0;">Трекер привычек</h2>
+            
+            <h3>Сегодня</h3>
+            <div id="today-habits"></div>
+
+            <div class="calendar-header">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" id="btn-calendar-week" class="button-secondary">Неделя</button>
+                <button type="button" id="btn-calendar-month" class="button-secondary">Месяц</button>
+                <button type="button" id="btn-prev-period" class="button-secondary">←</button>
+                <button type="button" id="btn-next-period" class="button-secondary">→</button>
+              </div>
+              <div id="calendar-period-title" style="font-weight:500;"></div>
+            </div>
+
+            <div id="calendar-container"></div>
+            
+            <div style="display:flex;gap:10px;margin-top:20px;">
+              <button type="button" id="btn-export-data" class="button-secondary" style="flex:1;">
+                📊 Экспорт данных
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Модалка добавления привычки -->
+  <div id="habit-modal" class="modal">
+    <div class="modal-content">
+      <h3 style="margin-top:0;">Новая привычка</h3>
+      <input type="text" id="habit-title" placeholder="Например: Пить 2 литра воды" autofocus>
+      <div style="margin:10px 0;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;">
+          <input type="checkbox" id="habit-daily">
+          Ежедневная привычка
+        </label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button type="button" id="habit-save" style="flex:1;">
+          <span id="save-text">Сохранить</span>
+          <span id="save-spinner" class="spinner" style="display:none;"></span>
+        </button>
+        <button type="button" id="habit-cancel" style="flex:1;background:#1e293b;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка добавления цели -->
+<div id="goal-modal" class="modal">
+  <div class="modal-content modal-wide">
+    <h3 style="margin-top:0;">🎯 Новая цель</h3>
+    
+    <div class="form-group">
+      <label for="goal-title">Название цели <span style="color:var(--error);">*</span></label>
+      <input type="text" id="goal-title" placeholder="Например: Изучить английский язык" required>
+      <div id="goal-title-error" class="error-message" style="display:none;"></div>
+    </div>
+    
+    <div class="form-group">
+      <label for="goal-description">Описание цели <span style="color:var(--error);">*</span></label>
+      <textarea id="goal-description" placeholder="Опишите детали цели... Что именно хотите достичь? Почему это важно? Какие критерии успеха?" rows="3"></textarea>
+      <div id="goal-description-error" class="error-message" style="display:none;"></div>
+    </div>
+    
+    <div class="form-group">
+      <label for="goal-category">Категория</label>
+      <select id="goal-category">
+        <option value="">Выберите категорию</option>
+        <option value="health">Здоровье</option>
+        <option value="career">Карьера</option>
+        <option value="education">Образование</option>
+        <option value="finance">Финансы</option>
+        <option value="relationships">Отношения</option>
+        <option value="personal">Личное развитие</option>
+        <option value="hobby">Хобби</option>
+        <option value="other">Другое</option>
+      </select>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0;">
+      <div class="form-group">
+        <label for="goal-priority">Приоритет</label>
+        <select id="goal-priority">
+          <option value="low">Низкий</option>
+          <option value="medium" selected>Средний</option>
+          <option value="high">Высокий</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="goal-complexity">Сложность</label>
+        <select id="goal-complexity">
+          <option value="easy">Легкая</option>
+          <option value="medium" selected>Средняя</option>
+          <option value="hard">Сложная</option>
+        </select>
+      </div>
+    </div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0;">
+      <div class="form-group">
+        <label for="goal-deadline">Дедлайн</label>
+        <input type="date" id="goal-deadline">
+      </div>
+      <div class="form-group">
+        <label for="goal-duration">Ожидаемая длительность (дней)</label>
+        <input type="number" id="goal-duration" min="1" max="365" placeholder="30" value="30">
+      </div>
+    </div>
+    
+    <!-- AI Декомпозиция как кнопка -->
+    <div class="form-group" style="margin:20px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <strong>🎯 Декомпозиция цели</strong>
+          <div style="font-size:12px;color:var(--muted);">
+            AI разобьет цель на подцели и предложит план достижения
+          </div>
+        </div>
+        <button type="button" id="btn-ai-decompose" class="button-secondary" style="font-size:12px;">
+          Запустить декомпозицию
+        </button>
+      </div>
+      
+      <div id="ai-decomposition-section" style="display:none;">
+        <div style="background:rgba(30,41,59,0.5);padding:12px;border-radius:8px;margin:10px 0;">
+          <div id="ai-status" style="display:flex;align-items:center;margin-bottom:8px;">
+            <span class="spinner decompose-spinner" style="display:none;margin-right:8px;"></span>
+            <span id="ai-status-text">AI проанализирует вашу цель и предложит план</span>
+          </div>
+          <div id="ai-suggestions" style="display:none;"></div>
+          <div id="ai-error" style="display:none;color:var(--error);font-size:12px;"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button type="button" id="goal-save" style="flex:1;" class="button-goal" disabled>
+        <span id="goal-save-text">Сохранить цель</span>
+        <span id="goal-save-spinner" class="spinner" style="display:none;"></span>
+      </button>
+      <button type="button" id="goal-cancel" style="flex:1;background:#1e293b;">Отмена</button>
+    </div>
+    
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);">
+      <div>💡 <strong>Подсказки:</strong></div>
+      <div>• Обязательно заполните название и описание цели</div>
+      <div>• Для лучшего результата декомпозиции используйте четкие и конкретные формулировки</div>
+      <div>• После запуска декомпозиции можно будет сохранить цель с готовым планом</div>
+    </div>
+  </div>
+</div>
+
+  <!-- Модалка деталей цели -->
+  <div id="goal-detail-modal" class="modal">
+    <div class="modal-content modal-wide">
+      <div id="goal-detail-content"></div>
+    </div>
+  </div>
+
+  <!-- Контейнер для toast уведомлений -->
+  <div id="toast-container"></div>
 
   <script src="main.js"></script>
 </body>
