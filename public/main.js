@@ -19,18 +19,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
   
   // Хеширование пароля
-  async function hashPassword(password) {
-    try {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(password + 'goalMateSalt');
-      const hash = await crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(hash))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-    } catch (error) {
-      console.error('Password hashing error:', error);
-      throw error;
-    }
+  // async function hashPassword(password) {
+  //   try {
+  //     const encoder = new TextEncoder();
+  //     const data = encoder.encode(password + 'goalMateSalt');
+  //     const hash = await crypto.subtle.digest('SHA-256', data);
+  //     return Array.from(new Uint8Array(hash))
+  //       .map(b => b.toString(16).padStart(2, '0'))
+  //       .join('');
+  //   } catch (error) {
+  //     console.error('Password hashing error:', error);
+  //     throw error;
+  //   }
+  // }
+
+  function hashPassword(password) {
+    console.log('⚠️ Note: Client-side hashing disabled, using plain password');
+    return password; // Сервер сам хэширует
   }
   
   // Валидация email
@@ -1223,13 +1228,14 @@ document.addEventListener('DOMContentLoaded', () => {
       setButtonLoading(registerBtn, true, 'register-spinner');
     }
     
-    try {
-      const hashedPassword = await hashPassword(password);
-      
+    try {      
       const response = await safeFetch(`/api/auth/${action}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password: hashedPassword })
+        body: JSON.stringify({ 
+          email: email.trim().toLowerCase(), 
+          password: password // Передаем пароль в открытом виде
+        })
       });
       
       if (response.user) {
