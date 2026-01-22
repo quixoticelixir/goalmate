@@ -19,12 +19,16 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 // === СХЕМА БД ===
+// Обновить схему БД
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  last_login TEXT,
+  login_count INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS goals (
@@ -80,11 +84,14 @@ CREATE INDEX IF NOT EXISTS idx_checkins_habit_date ON habit_checkins(habit_id, d
 `);
 
 // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БД ===
-function createUser(email, passwordHash) {
+function createUser(name, email, passwordHash) {
   const id = randomUUID();
-  db.prepare('INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)')
-    .run(id, email, passwordHash);
-  return { id, email };
+  const now = new Date().toISOString();
+  
+  db.prepare('INSERT INTO users (id, name, email, password_hash, created_at, last_login, login_count) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, name, email, passwordHash, now, now, 1);
+  
+  return { id, name, email };
 }
 
 function findUserByEmail(email) {
@@ -222,6 +229,11 @@ function deleteSubgoal(subgoalId) {
   return { success: true };
 }
 
+function deleteGoal(goalId) {
+  db.prepare('DELETE FROM goals WHERE id = ?').run(goalId);
+  return { success: true };
+}
+
 // Функции для привычек
 function getHabitsForUser(userId) {
   return db.prepare(`
@@ -297,51 +309,68 @@ function requireAuth(req, res, next) {
 // === АУТЕНТИФИКАЦИЯ ===
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password || password.length < 6) {
-      return res.status(400).json({ error: 'Email and password (min 6 chars) required' });
+    const { name, email, password } = req.body;
+    
+    // Валидация
+    if (!name || !email || !password || password.length < 8) {
+      return res.status(400).json({ error: 'Все поля обязательны, пароль минимум 8 символов' });
+    }
+    
+    // Проверка имени
+    if (name.length < 2 || name.length > 50 || !/^[a-zA-Zа-яА-ЯёЁ\s\-']+$/u.test(name)) {
+      return res.status(400).json({ error: 'Некорректное имя' });
     }
     
     const normalizedEmail = email.trim().toLowerCase();
     const existing = findUserByEmail(normalizedEmail);
+    
     if (existing) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
     }
     
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = createUser(normalizedEmail, passwordHash);
+    const user = createUser(name, normalizedEmail, passwordHash);
+    
     req.session.userId = user.id;
     
     res.json({ user: sanitizeUser(findUserById(user.id)) });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    res.status(500).json({ error: 'Ошибка регистрации' });
   }
 });
 
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' });
+      return res.status(400).json({ error: 'Email и пароль обязательны' });
     }
     
     const normalizedEmail = email.trim().toLowerCase();
     const user = findUserByEmail(normalizedEmail);
+    
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Неверный email или пароль' });
     }
     
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Неверный email или пароль' });
     }
     
+    // Обновляем статистику входа
+    const now = new Date().toISOString();
+    db.prepare('UPDATE users SET last_login = ?, login_count = login_count + 1 WHERE id = ?')
+      .run(now, user.id);
+    
     req.session.userId = user.id;
+    
     res.json({ user: sanitizeUser(user) });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    res.status(500).json({ error: 'Ошибка входа' });
   }
 });
 
@@ -407,6 +436,48 @@ app.patch('/api/goals/:id', requireAuth, (req, res) => {
   }
 });
 
+app.post('/api/goals/:id/complete', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const goal = getGoalById(id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    if (goal.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const updatedGoal = updateGoal(id, { completed: !goal.completed });
+    res.json({ goal: updatedGoal });
+  } catch (error) {
+    console.error('Complete goal error:', error);
+    res.status(500).json({ error: 'Failed to complete goal' });
+  }
+});
+
+app.delete('/api/goals/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const goal = getGoalById(id);
+    
+    if (!goal) {
+      return res.status(404).json({ error: 'Goal not found' });
+    }
+    
+    if (goal.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const result = deleteGoal(id);
+    res.json(result);
+  } catch (error) {
+    console.error('Delete goal error:', error);
+    res.status(500).json({ error: 'Failed to delete goal' });
+  }
+});
+
 // Подцели
 app.post('/api/goals/:goalId/subgoals', requireAuth, (req, res) => {
   try {
@@ -461,6 +532,76 @@ app.delete('/api/goals/:goalId/subgoals/:subgoalId', requireAuth, (req, res) => 
     }
     
     const result = deleteSubgoal(subgoalId);
+    res.json(result);
+  } catch (error) {
+    console.error('Delete subgoal error:', error);
+    res.status(500).json({ error: 'Failed to delete subgoal' });
+  }
+});
+
+// Новый эндпоинт для управления подцелями напрямую
+app.patch('/api/subgoals/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { completed, title, description } = req.body;
+    
+    const subgoal = db.prepare('SELECT * FROM subgoals WHERE id = ?').get(id);
+    if (!subgoal) {
+      return res.status(404).json({ error: 'Subgoal not found' });
+    }
+    
+    // Получаем цель для проверки прав доступа
+    const goal = getGoalById(subgoal.goal_id);
+    if (!goal || goal.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const updates = [];
+    const values = [];
+    
+    if (completed !== undefined) {
+      updates.push('completed = ?');
+      values.push(completed ? 1 : 0);
+    }
+    
+    if (title !== undefined) {
+      updates.push('title = ?');
+      values.push(title);
+    }
+    
+    if (description !== undefined) {
+      updates.push('description = ?');
+      values.push(description);
+    }
+    
+    if (updates.length > 0) {
+      values.push(id);
+      db.prepare(`UPDATE subgoals SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+    }
+    
+    const updatedSubgoal = db.prepare('SELECT * FROM subgoals WHERE id = ?').get(id);
+    res.json({ subgoal: updatedSubgoal });
+  } catch (error) {
+    console.error('Update subgoal error:', error);
+    res.status(500).json({ error: 'Failed to update subgoal' });
+  }
+});
+
+app.delete('/api/subgoals/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const subgoal = db.prepare('SELECT * FROM subgoals WHERE id = ?').get(id);
+    if (!subgoal) {
+      return res.status(404).json({ error: 'Subgoal not found' });
+    }
+    
+    const goal = getGoalById(subgoal.goal_id);
+    if (!goal || goal.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const result = deleteSubgoal(id);
     res.json(result);
   } catch (error) {
     console.error('Delete subgoal error:', error);
