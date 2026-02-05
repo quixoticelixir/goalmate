@@ -132,7 +132,7 @@ function resetGoalForm() {
     'goal-category': '',
     'goal-priority': 'medium',
     'goal-complexity': 'medium',
-    'goal-duration': '30'
+    'goal-deadline': ''
   };
 
   Object.entries(fields).forEach(([id, value]) => {
@@ -149,10 +149,26 @@ function resetGoalForm() {
   }
 
   isAIProcessing = false;
+  currentAIPlan = null; // ← ВАЖНО: очищаем предыдущий AI план
 
-  // Скрыть AI-секцию
+  // Скрыть AI-секцию и ОЧИСТИТЬ содержимое
   const aiSection = document.getElementById('ai-decomposition-section');
-  if (aiSection) aiSection.style.display = 'none';
+  const aiSuggestions = document.getElementById('ai-suggestions');
+  
+  if (aiSection) {
+    aiSection.style.display = 'none';
+    // Сбрасываем статус AI
+    const statusText = document.getElementById('ai-status-text');
+    if (statusText) statusText.textContent = 'AI проанализирует вашу цель и предложит план';
+    
+    const spinner = document.querySelector('.decompose-spinner');
+    if (spinner) spinner.style.display = 'none';
+  }
+  
+  if (aiSuggestions) {
+    aiSuggestions.style.display = 'none';
+    aiSuggestions.innerHTML = ''; // ← ОЧИЩАЕМ предыдущие подцели
+  }
 
   const decomposeBtn = document.getElementById('btn-ai-decompose');
   if (decomposeBtn) {
@@ -536,24 +552,37 @@ async function saveGoalHandler() {
   
   if (!validateGoalForm() || isAIProcessing) return;
 
+  // ВАЖНО: Собираем ТОЛЬКО данные из формы, не из предыдущего плана
   const goalData = collectGoalData();
+  
+  // ЯВНО очищаем subgoals если AI план не был сгенерирован
+  const aiSection = document.getElementById('ai-decomposition-section');
+  const aiSuggestions = document.getElementById('ai-suggestions');
+  
+  if ((!aiSection || aiSection.style.display === 'none') && 
+      (!aiSuggestions || aiSuggestions.style.display === 'none')) {
+    // AI план не был сгенерирован - убираем подцели
+    delete goalData.subgoals;
+  }
+  
   const saveBtn = document.getElementById('goal-save');
   UI.setButtonLoading(saveBtn, true);
 
   try {
     let response;
     if (isEdit) {
-      // Обновление
       response = await API.updateGoal(goalId, goalData);
       UI.showToast(`Цель "${response.goal.title}" обновлена!`, 'success');
     } else {
-      // Создание
       response = await API.saveGoal(goalData);
       UI.showToast(`Цель "${response.goal.title}" создана!`, 'success');
     }
     
     UI.hideModal('goal-modal');
+    // ЯВНО сбрасываем форму
+    resetGoalForm();
     await refreshGoalsOnActiveTab();
+    
   } catch (error) {
     UI.showToast('Ошибка: ' + (error.message || 'Неизвестная ошибка'), 'error');
   } finally {

@@ -8,6 +8,7 @@ const { randomUUID } = require('crypto');
 const { decomposeGoal } = require('./src/services/goalDecomposer');
 const Database = require('better-sqlite3');
 const fs = require('fs');
+const { GoalHabitMultiAgentSystem } = require('./src/services/multiagent');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +20,6 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 
 // === СХЕМА БД ===
-// Обновить схему БД
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS habits (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   title TEXT NOT NULL,
+  description TEXT,          -- ← добавь эту строку
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -249,11 +250,18 @@ function getHabitsForUser(userId) {
   }));
 }
 
-function createHabit(userId, title) {
+function createHabit(userId, title, description = '') {
   const id = randomUUID();
-  db.prepare('INSERT INTO habits (id, user_id, title) VALUES (?, ?, ?)')
-    .run(id, userId, title);
-  return { id, title, user_id: userId, created_at: new Date().toISOString() };
+  db.prepare('INSERT INTO habits (id, user_id, title, description) VALUES (?, ?, ?, ?)')
+    .run(id, userId, title.trim(), (description || '').trim());
+  
+  return {
+    id,
+    title: title.trim(),
+    description: (description || '').trim(),
+    user_id: userId,
+    created_at: new Date().toISOString()
+  };
 }
 
 function createHabitCheckin(habitId, date) {
@@ -272,6 +280,23 @@ function deleteHabitCheckin(habitId, date) {
     .run(habitId, date);
   return { success: true };
 }
+
+app.patch('/api/habits/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { title } = req.body;
+
+  if (!title || typeof title !== 'string' || title.trim().length < 2) {
+    return res.status(400).json({ error: 'Название должно быть строкой минимум из 2 символов' });
+  }
+
+  const habit = db.prepare('SELECT user_id FROM habits WHERE id = ?').get(id);
+  if (!habit || habit.user_id !== req.session.userId) {
+    return res.status(403).json({ error: 'Доступ запрещён' });
+  }
+
+  db.prepare('UPDATE habits SET title = ? WHERE id = ?').run(title.trim(), id);
+  res.json({ success: true });
+});
 
 // === НАСТРОЙКА EXPRESS ===
 app.use(cors());
@@ -743,6 +768,31 @@ app.delete('/api/habits/:id/checkin', requireAuth, (req, res) => {
   }
 });
 
+// УДАЛЕНИЕ ПРИВЫЧКИ
+app.delete('/api/habits/:id', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Проверяем, существует ли привычка и принадлежит ли пользователю
+    const habit = db.prepare('SELECT user_id FROM habits WHERE id = ?').get(id);
+    if (!habit) {
+      return res.status(404).json({ error: 'Привычка не найдена' });
+    }
+    
+    if (habit.user_id !== req.session.userId) {
+      return res.status(403).json({ error: 'Доступ запрещён' });
+    }
+    
+    // Удаляем привычку (и автоматически — все checkins благодаря ON DELETE CASCADE)
+    db.prepare('DELETE FROM habits WHERE id = ?').run(id);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete habit error:', error);
+    res.status(500).json({ error: 'Не удалось удалить привычку' });
+  }
+});
+
 // === СТАТИЧЕСКИЕ ФАЙЛЫ И ЗАПУСК ===
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -753,3 +803,23 @@ app.listen(PORT, () => {
   console.log(`📁 Database: ${DB_PATH}`);
   console.log(`🤖 AI Features: ${process.env.USE_OPENAI === 'true' ? 'OpenAI' : process.env.USE_HF === 'true' ? 'HuggingFace' : 'Heuristic'}`);
 });
+
+app.post('/api/ai-chat', requireAuth, async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'Нет сообщения' });
+
+  try {
+    const system = new GoalHabitMultiAgentSystem();
+    const result = await system.process(text.trim());
+    return res.json(result); // ← именно этот формат ожидает фронтенд
+  } catch (error) {
+    console.error('Multi-agent error:', error);
+    return res.status(500).json({
+      type: 'clarify',
+      payload: { question: 'Произошла ошибка при обработке запроса. Попробуйте позже.' }
+    });
+  }
+});
+
+
+

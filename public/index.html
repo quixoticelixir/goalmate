@@ -173,6 +173,541 @@
       justify-content: center;
     }
 
+    
+    /* ==================== AI-ЦЕНТРИЧНЫЙ ИНТЕРФЕЙС ==================== */
+
+    /* Боковая панель мини */
+    .mini-sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      height: 100vh;
+      width: 70px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 1000;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mini-sidebar:hover {
+      width: 220px;
+      box-shadow: 0 0 30px rgba(139, 92, 246, 0.2);
+    }
+
+    .mini-sidebar-content {
+      padding: 1.5rem 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mini-logo {
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      padding: 0 1rem;
+    }
+
+    .mini-nav-items {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .mini-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s ease;
+      position: relative;
+      width: 100%;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .mini-nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      transform: translateX(4px);
+    }
+
+    .mini-nav-item.active {
+      background: linear-gradient(90deg, 
+        rgba(139, 92, 246, 0.2) 0%, 
+        rgba(139, 92, 246, 0.1) 100%
+      );
+      color: var(--goal-color);
+      border-left: 3px solid var(--goal-color);
+    }
+
+    .mini-nav-item span:first-child {
+      font-size: 1.25rem;
+      min-width: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mini-nav-label {
+      opacity: 0;
+      transform: translateX(-10px);
+      transition: all 0.3s ease;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .mini-sidebar:hover .mini-nav-label {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .mini-nav-count {
+      margin-left: auto;
+      font-size: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.125rem 0.375rem;
+      border-radius: 10px;
+      min-width: 24px;
+      text-align: center;
+      opacity: 0;
+      transform: scale(0.8);
+      transition: all 0.3s ease;
+    }
+
+    .mini-sidebar:hover .mini-nav-count {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .mini-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 1rem 1rem;
+    }
+
+    .mini-sidebar-footer {
+      margin-top: auto;
+      padding: 0 1rem;
+    }
+
+    .week-progress {
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+
+    .mini-sidebar:hover .week-progress {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .week-progress-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .week-progress-percent {
+      font-size: 0.75rem;
+      color: var(--goal-color);
+      font-weight: 600;
+      text-align: right;
+      margin-top: 0.25rem;
+    }
+
+    .user-avatar-micro {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-primary), var(--goal-color));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    /* Главный AI интерфейс */
+    .ai-chat-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 2rem 2rem 5rem; /* Отступ слева для мини-сайдбара */
+    }
+
+    .ai-chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2.5rem;
+    }
+
+    .ai-chat-title h1 {
+      font-size: 2.5rem;
+      margin: 0 0 0.5rem 0;
+      background: linear-gradient(135deg, var(--text-primary), var(--goal-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .ai-chat-subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    .user-info-mini {
+      position: relative;
+    }
+
+    .user-avatar-mini {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-primary), var(--goal-color));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 600;
+      font-size: 1.25rem;
+      border: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Главное поле ввода */
+    .ai-input-container {
+      margin-bottom: 2.5rem;
+    }
+
+    .ai-input-wrapper {
+      position: relative;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-xl);
+      padding: 2rem;
+      box-shadow: var(--shadow-xl);
+    }
+
+    .ai-main-input {
+      width: 100%;
+      min-height: 120px;
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-size: 1.125rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      font-family: var(--font-sans);
+      padding: 0;
+      margin-bottom: 1.5rem;
+    }
+
+    .ai-main-input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    .ai-input-hints {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding-top: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .hint-title {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .hint-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .hint-item {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 0.5rem 0.75rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+    }
+
+    .hint-item:hover {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--goal-color);
+      border-color: rgba(139, 92, 246, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .ai-send-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .ai-send-icon {
+      font-size: 1.25rem;
+      transition: transform 0.2s ease;
+    }
+
+    .ai-send-btn:hover .ai-send-icon {
+      transform: translateX(4px);
+    }
+
+    /* Быстрые кнопки */
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .quick-action-btn {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      color: var(--text-secondary);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .quick-action-btn:hover {
+      background: rgba(30, 41, 59, 0.9);
+      border-color: var(--goal-color);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 25px rgba(139, 92, 246, 0.2);
+      color: var(--text-primary);
+    }
+
+    .quick-action-icon {
+      font-size: 2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .quick-action-label {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .quick-action-count {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: var(--goal-color);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.125rem 0.375rem;
+      border-radius: 10px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    /* Сегодняшние задачи */
+    .today-tasks-preview {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-xl);
+      padding: 1.5rem;
+    }
+
+    .today-tasks-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .today-tasks-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+
+    .today-progress {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    #today-progress-text {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .progress-bar.mini {
+      height: 6px;
+      width: 100px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar.mini .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--success), #34d399);
+    }
+
+    .today-tasks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .today-task-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .today-task-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--border-light);
+    }
+
+    .today-task-checkbox {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid var(--border-medium);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .today-task-checkbox.checked {
+      background: var(--success);
+      border-color: var(--success);
+      color: white;
+    }
+
+    .today-task-content {
+      flex: 1;
+    }
+
+    .today-task-title {
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      margin-bottom: 0.25rem;
+    }
+
+    .today-task-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+      .mini-sidebar {
+        width: 100%;
+        height: 70px;
+        bottom: 0;
+        top: auto;
+        flex-direction: row;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      .mini-sidebar:hover {
+        width: 100%;
+        height: auto;
+        min-height: 300px;
+      }
+      
+      .mini-sidebar-content {
+        flex-direction: row;
+        padding: 0;
+        width: 100%;
+      }
+      
+      .mini-logo {
+        display: none;
+      }
+      
+      .mini-nav-items {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 0.75rem;
+        margin: 0;
+      }
+      
+      .mini-nav-item {
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.5rem;
+        min-width: 60px;
+      }
+      
+      .mini-nav-label {
+        font-size: 0.75rem;
+      }
+      
+      .mini-divider {
+        display: none;
+      }
+      
+      .mini-sidebar-footer {
+        display: none;
+      }
+      
+      .ai-chat-container {
+        padding: 1rem 1rem 5rem 1rem;
+      }
+      
+      .quick-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .ai-chat-title h1 {
+        font-size: 2rem;
+      }
+    }
+
     /* ==================== ОСНОВНОЙ КОНТЕНТ ==================== */
     .main-content {
       flex: 1;
@@ -516,6 +1051,101 @@
       font-size: 1.25rem;
     }
 
+    /* ==================== КАРТОЧКИ ПРИВЫЧЕК НАД ТРЕКЕРОМ ==================== */
+    .habits-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 1.5rem;
+    }
+
+    .habit-card-above {
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      text-align: center;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .habit-card-above::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--habit-color), #22d3ee);
+    }
+
+    .habit-card-above:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-xl);
+      border-color: rgba(6, 182, 212, 0.4);
+    }
+
+    .habit-card-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 15px;
+      color: var(--text-primary);
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .habit-card-streak {
+      font-size: 13px;
+      color: var(--habit-color);
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .habit-card-actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .habit-card-actions button {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+
+    .habit-card-actions button:hover {
+      transform: scale(1.1);
+      background: rgba(6, 182, 212, 0.2);
+      color: white;
+    }
+
+    .habit-card-actions .btn-toggle-today.button-success:hover {
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .habit-card-actions .btn-delete-habit:hover {
+      background: rgba(239, 68, 68, 0.2);
+    }
+
     /* ==================== КАРТОЧКИ ЭЛЕМЕНТОВ ==================== */
     .goal-card {
       background: linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
@@ -654,6 +1284,55 @@
       background: rgba(6, 182, 212, 0.15);
       color: var(--habit-color);
       border: 1px solid rgba(6, 182, 212, 0.3);
+    }
+
+    .habits-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .habit-card-above {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .habit-card-above:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .habit-card-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .habit-card-streak {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .habit-card-actions {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .habit-card-actions button {
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* ==================== ПРОГРЕСС БАРЫ ==================== */
@@ -824,6 +1503,56 @@
     .modal-close:hover {
       background: rgba(255, 255, 255, 0.1);
       color: var(--text-primary);
+    }
+
+    .help-category {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .help-category-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .help-category-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .help-category-items {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .help-category-items div {
+      padding: 0.25rem 0;
+    }
+
+    .help-examples {
+      background: rgba(30, 41, 59, 0.3);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      border-left: 3px solid var(--goal-color);
+    }
+
+    .help-examples h4 {
+      margin: 0 0 0.75rem 0;
+      color: var(--text-primary);
+    }
+
+    .help-examples ul {
+      padding-left: 1.25rem;
+      margin: 0;
+    }
+
+    .help-examples li {
+      margin-bottom: 0.5rem;
     }
 
     /* ==================== TOAST УВЕДОМЛЕНИЯ ==================== */
@@ -1264,6 +1993,124 @@
       scrollbar-width: thin;
       scrollbar-color: var(--text-muted) rgba(255, 255, 255, 0.05);
     }
+
+
+    /* ==================== ИСПРАВЛЕНИЕ ПЕРЕКРЫТИЯ ==================== */
+
+    /* Основной контент должен иметь отступ слева равный ширине мини-сайдбара */
+    .main-content {
+      margin-left: 70px; /* Ширина свернутой панели */
+      transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      width: calc(100% - 70px);
+    }
+
+    /* Когда сайдбар развернут, увеличиваем отступ */
+    .mini-sidebar:hover ~ .main-content {
+      margin-left: 220px; /* Ширина развернутой панели */
+      width: calc(100% - 220px);
+    }
+
+    /* Убедитесь, что контейнеры имеют правильную ширину */
+    .content-card, 
+    .ai-chat-container,
+    .content-section {
+      max-width: none;
+      width: 100%;
+    }
+
+    /* Адаптивность для мобильных */
+    @media (max-width: 768px) {
+      .mini-sidebar {
+        width: 100%;
+        height: 70px;
+        bottom: 0;
+        top: auto;
+        flex-direction: row;
+        border-right: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 1000;
+      }
+      
+      .mini-sidebar:hover {
+        width: 100%;
+        height: auto;
+        min-height: 300px;
+        bottom: 0;
+      }
+      
+      .main-content {
+        margin-left: 0;
+        margin-bottom: 70px;
+        width: 100%;
+      }
+      
+      .mini-sidebar:hover ~ .main-content {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+
+    /* ==================== СТАТИСТИКА ==================== */
+    .stat-mini {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+
+    .stat-value-mini {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.2;
+    }
+
+    .stat-label-mini {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .stat-subtext {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border-light);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card:hover {
+      border-color: var(--border-medium);
+      transform: translateY(-2px);
+    }
+
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.2;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-card .stat-label {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 <body>
@@ -1358,25 +2205,6 @@
   <!-- Основной интерфейс -->
   <div id="app-content" style="display:none;">
     <div class="app">
-      <!-- Боковое меню -->
-      <nav class="sidebar">
-        <h1 class="sidebar-header">GoalMate</h1>
-        <ul class="sidebar-nav">
-          <li><div class="sidebar-item active" data-page="home" role="button" tabindex="0">
-            <span>🏠</span> Главная
-          </div></li>
-          <li><div class="sidebar-item" data-page="goals" role="button" tabindex="0">
-            <span>🎯</span> Мои цели
-          </div></li>
-          <li><div class="sidebar-item" data-page="habits-tracker" role="button" tabindex="0">
-            <span>🔁</span> Трекер привычек
-          </div></li>
-          <li><div class="sidebar-item" data-page="logout" role="button" tabindex="0">
-            <span>🚪</span> Выйти
-          </div></li>
-        </ul>
-      </nav>
-
       <!-- Основной контент -->
       <main class="main-content">
         <header class="page-header">
@@ -1395,49 +2223,88 @@
           </div>
         </header>
 
-        <!-- Главное меню -->
-        <section id="page-home" class="content-section" style="display:block;">
-          <div class="content-card">
-            <h2 style="margin-top:0;">Что хочешь сделать?</h2>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0;">
-              <button type="button" id="btn-goals" class="btn btn-goal btn-lg">
-                🎯 Новая цель
-              </button>
-              <button type="button" id="btn-habits" class="btn btn-habit btn-lg">
-                🔁 Управление привычками
-              </button>
+        <!-- Главный экран -->
+        <section id="page-ai-chat" class="page-content" style="display:none;">
+          <div class="ai-chat-container">
+            <!-- Шапка -->
+            <div class="ai-chat-header">
+              <div class="ai-chat-title">
+                <!-- <img src="images/ai-assistant.png" alt="AI Ассистент" class="ai-assistant-image"> -->
+                <h1>Чем могу помочь сегодня?</h1>
+                <p class="ai-chat-subtitle">Напишите вашу цель или задачу — AI создаст план и отследит прогресс</p>
+              </div>
+              <div class="user-info-mini">
+                <div class="user-avatar-mini" id="user-initial-mini">G</div>
+              </div>
             </div>
-            <div id="quick-stats" style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--border-light);">
-              <h3 style="margin-top:0;">Быстрая статистика</h3>
-                <div id="stats-content">
-                  <div class="stats-grid">
-                    <div class="stat-card">
-                      <div class="stat-value" id="stat-total-goals">—</div>
-                      <div class="stat-label">Всего целей</div>
-                    </div>
-                    <div class="stat-card">
-                      <div class="stat-value" id="stat-completed-goals">—</div>
-                      <div class="stat-label">Завершено</div>
-                    </div>
-                    <div class="stat-card">
-                      <div class="stat-value" id="stat-active-habits">—</div>
-                      <div class="stat-label">Активные привычки</div>
-                    </div>
-                    <div class="stat-card">
-                      <div class="stat-value">
-                        <span id="stat-streak">—</span>
-                        <span id="streak-fire" style="display:none; margin-left:4px;">🔥</span>
-                      </div>
-                      <div class="stat-label">Текущая серия</div>
-                    </div>
+
+            <!-- Главное поле ввода -->
+            <div class="ai-input-container">
+              <div class="ai-input-wrapper">
+                <textarea 
+                  id="ai-main-input" 
+                  class="ai-main-input" 
+                  placeholder="Например: «Хочу бегать 3 раза в неделю» или «Поставь цель: выучить Python за 3 месяца»"
+                  rows="4"
+                ></textarea>
+                <div class="ai-input-hints">
+                  <div class="hint-title">💡 Попробуйте написать:</div>
+                  <div class="hint-items">
+                    <span class="hint-item">Хочу читать 30 минут в день</span>
+                    <span class="hint-item">Написать отчет до следующего месяца</span>
+                    <span class="hint-item">Отметь сегодняшнюю медитацию</span>
+                    <span class="hint-item">Выучить английский за 2 месяца</span>
                   </div>
                 </div>
+                <button id="ai-send-btn" class="btn btn-primary ai-send-btn">
+                  <span>Начать</span>
+                  <span class="ai-send-icon">➤</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Быстрые кнопки -->
+            <div class="quick-actions-grid">
+              <button class="quick-action-btn" data-action="goals">
+                <div class="quick-action-icon">🎯</div>
+                <div class="quick-action-label">Цели</div>
+                <div class="quick-action-count goals-counter">0</div> <!-- ← класс -->
+              </button>
+              <button class="quick-action-btn" data-action="habits">
+                <div class="quick-action-icon">🔁</div>
+                <div class="quick-action-label">Привычки</div>
+                <div class="quick-action-count habits-counter">0/0</div> <!-- ← класс -->
+              </button>
+              <button class="quick-action-btn" data-action="analytics">
+                <div class="quick-action-icon">📊</div>
+                <div class="quick-action-label">Анализ</div>
+              </button>
+              <button class="quick-action-btn" data-action="settings">
+                <div class="quick-action-icon">⚙️</div>
+                <div class="quick-action-label">Настройки</div>
+              </button>
+            </div>
+
+            <!-- Сегодняшние задачи -->
+            <div class="today-tasks-preview">
+              <div class="today-tasks-header">
+                <h3>📅 Сегодня</h3>
+                <div class="today-progress">
+                  <span id="today-progress-text">0/0 выполнено</span>
+                  <div class="progress-bar mini">
+                    <div class="progress-fill" id="today-progress-bar" style="width:0%"></div>
+                  </div>
+                </div>
+              </div>
+              <div id="today-tasks-list" class="today-tasks-list">
+                <!-- Динамически заполняется -->
+              </div>
             </div>
           </div>
         </section>
 
         <!-- Раздел целей -->
-        <section id="page-goals" class="content-section" style="display:none;">
+        <section id="page-goals" class="page-content" style="display:none;">
           <div class="content-card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
               <h2 style="margin:0;">🎯 Мои цели</h2>
@@ -1476,12 +2343,17 @@
         </section>
 
         <!-- Трекер привычек -->
-        <section id="page-habits-tracker" class="content-section" style="display:none;">
+        <section id="page-habits-tracker" class="page-content" style="display:none;">
           <div class="content-card">
             <h2 style="margin-top:0;">Трекер привычек</h2>
-            
-            <h3 style="margin-bottom:1rem;">Сегодня</h3>
-            <div id="today-habits" style="margin-bottom:2rem;"></div>
+            <!-- Кнопка "Добавить привычку" -->
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem;">
+              <button id="btn-add-habit" class="btn btn-primary">
+                ➕ Добавить привычку
+              </button>
+            </div>
+            <!-- Карточки привычек над календарём -->
+            <div id="habits-cards-above-calendar" class="habits-cards-grid" style="margin-bottom: 1.5rem;"></div>
 
             <div class="calendar-header">
               <div class="calendar-controls">
@@ -1507,26 +2379,120 @@
     </div>
   </div>
 
+  <!-- Боковая панель мини -->
+  <nav id="mini-sidebar" class="mini-sidebar">
+    <div class="mini-sidebar-content">
+      <div class="mini-logo">🎯</div>
+      
+      <div class="mini-nav-items">
+        <button class="mini-nav-item active" data-page="ai-chat" title="Главная">
+          <span>🏠</span>
+          <span class="mini-nav-label">Главная</span>
+        </button>
+        
+        <button class="mini-nav-item" data-page="goals" title="Цели">
+          <span>🎯</span>
+          <span class="mini-nav-label">Цели</span>
+          <span class="mini-nav-count goals-counter">0</span> <!-- ← тот же класс! -->
+        </button>
+
+        <button class="mini-nav-item" data-page="habits-tracker" title="Привычки">
+          <span>🔁</span>
+          <span class="mini-nav-label">Привычки</span>
+          <span class="mini-nav-count habits-counter">0/0</span> <!-- ← тот же класс! -->
+        </button>
+        
+        <button class="mini-nav-item" data-page="calendar" title="Календарь">
+          <span>📅</span>
+          <span class="mini-nav-label">Календарь</span>
+        </button>
+      </div>
+      
+      <div class="mini-divider"></div>
+      
+      <div class="mini-nav-items">
+        <button class="mini-nav-item" data-page="stats" title="Статистика">
+          <span>📊</span>
+          <span class="mini-nav-label">Статистика</span>
+        </button>
+        
+        <button class="mini-nav-item" data-page="achievements" title="Достижения">
+          <span>🏆</span>
+          <span class="mini-nav-label">Достижения</span>
+        </button>
+      </div>
+      
+      <div class="mini-divider"></div>
+      
+      <div class="mini-nav-items">
+        <button class="mini-nav-item" data-page="settings" title="Настройки">
+          <span>⚙️</span>
+          <span class="mini-nav-label">Настройки</span>
+        </button>
+        
+        <button class="mini-nav-item" data-page="profile" title="Профиль">
+          <span class="user-avatar-micro" id="user-initial-micro">G</span>
+          <span class="mini-nav-label">Профиль</span>
+        </button>
+      </div>
+      
+      <div class="mini-sidebar-footer">
+        <div class="week-progress">
+          <div class="week-progress-label">Неделя</div>
+          <div class="progress-bar mini">
+            <div class="progress-fill" id="week-progress-bar" style="width:72%"></div>
+          </div>
+          <div class="week-progress-percent">72%</div>
+        </div>
+      </div>
+    </div>
+  </nav>
+  
   <!-- Модалки -->
+  <!-- Модалка: Создание привычки -->
   <div id="habit-modal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">Новая привычка</h3>
-        <button type="button" class="modal-close" onclick="UI.hideModal('habit-modal')">×</button>
+        <h3 class="modal-title">🔁 Новая привычка</h3>
+        <button type="button" class="modal-close" id="habit-modal-close">×</button>
       </div>
-      <input type="text" id="habit-title" placeholder="Например: Пить 2 литра воды" autofocus>
-      <div style="margin:1rem 0;">
-        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;">
-          <input type="checkbox" id="habit-daily" checked>
-          Ежедневная привычка
-        </label>
+      <div class="form-group">
+        <label for="habit-title">Название привычки <span style="color:var(--error);">*</span></label>
+        <input type="text" id="habit-title" placeholder="Например: Пить 2 литра воды" title="Краткое название действия, которое хотите отслеживать" required>
+      </div>
+      <div class="form-group">
+        <label for="habit-description">Описание (необязательно)</label>
+        <textarea id="habit-description" placeholder="Почему это важно? Как проверить выполнение?" title="Дополнительные детали для мотивации и ясности"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" id="habit-daily" checked>
+        <label for="habit-daily" style="margin:0;">Ежедневная привычка</label>
       </div>
       <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
-        <button type="button" id="habit-save" class="btn btn-primary" style="flex:1;">
-          <span id="save-text">Сохранить</span>
-          <span id="save-spinner" class="spinner" style="display:none;"></span>
-        </button>
+        <button type="button" id="habit-save" class="btn btn-habit" style="flex:1;">Сохранить</button>
         <button type="button" id="habit-cancel" class="btn btn-secondary" style="flex:1;">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка: Редактирование привычки -->
+  <div id="edit-habit-modal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ Редактировать привычку</h3>
+        <button type="button" class="modal-close" id="edit-habit-modal-close">×</button>
+      </div>
+      <div class="form-group">
+        <label for="edit-habit-title">Название привычки <span style="color:var(--error);">*</span></label>
+        <input type="text" id="edit-habit-title" placeholder="Например: Прогулка 30 минут" title="Измените название привычки" required maxlength="100">
+      </div>
+      <div class="form-group">
+        <label for="edit-habit-description">Описание (необязательно)</label>
+        <textarea id="edit-habit-description" placeholder="Обновите описание, если нужно" title="Дополнительные детали"></textarea>
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+        <button id="edit-habit-save" class="btn btn-habit" style="flex:1;">Сохранить</button>
+        <button id="edit-habit-cancel" class="btn btn-secondary" style="flex:1;">Отмена</button>
       </div>
     </div>
   </div>
@@ -1535,7 +2501,7 @@
     <div class="modal-content modal-wide">
       <div class="modal-header">
         <h3 class="modal-title">🎯 Новая цель</h3>
-        <button type="button" class="modal-close" onclick="UI.hideModal('goal-modal')">×</button>
+        <button type="button" class="modal-close" id="goal-modal-close">×</button>
       </div>
       
       <div class="form-group">
@@ -1641,7 +2607,47 @@
       <div id="goal-detail-content" style="padding:0 20px 20px;"></div>
     </div>
   </div>
-
+  <div id="help-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title">🤖 Что умеет AI ассистент</h3>
+        <button type="button" class="modal-close" id="goal-detail-modal-close">×</button>
+      </div>
+      <div style="padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+          <div class="help-category">
+            <div class="help-category-icon">🎯</div>
+            <div class="help-category-title">Цели</div>
+            <div class="help-category-items">
+              <div>«Хочу выучить английский»</div>
+              <div>«Поставь цель на 3 месяца»</div>
+              <div>«Планируй проект»</div>
+            </div>
+          </div>
+          <div class="help-category">
+            <div class="help-category-icon">🔁</div>
+            <div class="help-category-title">Привычки</div>
+            <div class="help-category-items">
+              <div>«Хочу бегать 3 раза в неделю»</div>
+              <div>«Привычка читать каждый день»</div>
+              <div>«Отметь тренировку»</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="help-examples">
+          <h4>Примеры команд:</h4>
+          <ul style="color: var(--text-secondary); font-size: 0.875rem; line-height: 1.6;">
+            <li><strong>«Планируй мне тренировки на неделю»</strong> — создаст расписание</li>
+            <li><strong>«Покажи мою статистику за месяц»</strong> — откроет аналитику</li>
+            <li><strong>«Отметь сегодняшнюю медитацию»</strong> — отметит привычку</li>
+            <li><strong>«Сколько у меня активных целей?»</strong> — покажет счетчики</li>
+            <li><strong>«Создай план изучения Python»</strong> — декомпозирует цель</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

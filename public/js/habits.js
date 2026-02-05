@@ -1,102 +1,14 @@
+// habits.js
 import * as API from './api.js';
 import * as UI from './ui.js';
 import * as Auth from './auth.js';
+// Импортируем константы и утилиты
+import { formatLocalDate, isFutureDate, calculateCurrentStreak, calculateMaxStreak, ensureAuthenticated, MONTH_NAMES, SHORT_MONTH_NAMES } from './habitUtils.js';
+import { renderHabitsList, renderTodayHabits, renderCalendar, renderHabitsCardsAboveCalendar } from './habitUI.js';
 
 // ==================== КОНСТАНТЫ И СОСТОЯНИЕ ====================
-const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-const SHORT_MONTH_NAMES = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
-const DAY_NAMES = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const FULL_DAY_NAMES = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
-
 let calendarView = 'month';
 let currentPeriod = new Date();
-
-// ==================== ВСПОМОГАТЕЛЬНЫЕ УТИЛИТЫ ====================
-
-/**
- * Форматирует дату в локальный YYYY-MM-DD (без UTC-сдвига)
- */
-function formatLocalDate(date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-    .toLocaleDateString('en-CA');
-}
-
-/**
- * Проверяет авторизацию и показывает экран входа при необходимости
- * @returns {boolean} — true если авторизован
- */
-function ensureAuthenticated() {
-  if (!Auth.isAuthenticated()) {
-    UI.showToast('Требуется авторизация', 'warning');
-    showAuthScreen();
-    return false;
-  }
-  return true;
-}
-
-/**
- * Показывает экран авторизации
- */
-function showAuthScreen() {
-  const authScreen = document.getElementById('auth-screen');
-  const appContent = document.getElementById('app-content');
-  if (authScreen && appContent) {
-    authScreen.style.display = 'block';
-    appContent.style.display = 'none';
-  }
-}
-
-/**
- * Получает текущую активную страницу
- */
-function getCurrentActivePage() {
-  const activeSidebarItem = document.querySelector('.sidebar-item.active');
-  if (activeSidebarItem) return activeSidebarItem.dataset.page;
-
-  const pages = ['home', 'goals', 'habits-list', 'habits-tracker'];
-  for (const page of pages) {
-    const el = document.getElementById(`page-${page}`);
-    if (el && el.style.display !== 'none') return page;
-  }
-  return 'home';
-}
-
-/**
- * Обновляет все виды, зависящие от привычек
- */
-async function refreshHabitViews() {
-  try {
-    const habits = await API.loadHabits(true);
-    const activePage = getCurrentActivePage();
-
-    switch (activePage) {
-      case 'habits-list':
-        renderHabitsList(habits);
-        break;
-      case 'habits-tracker':
-        renderTodayHabits(habits);
-        renderCalendar(habits);
-        break;
-      case 'home':
-        renderTodayHabits(habits);
-        break;
-      default:
-        // Обновляем все возможные контейнеры
-        const containers = [
-          { id: 'calendar-container', fn: () => renderCalendar(habits) },
-          { id: 'today-habits', fn: () => renderTodayHabits(habits) },
-          { id: 'habits-list-container', fn: () => renderHabitsList(habits) }
-        ];
-        containers.forEach(({ id, fn }) => {
-          const el = document.getElementById(id);
-          if (el && el.style.display !== 'none') fn();
-        });
-    }
-  } catch (error) {
-    console.error('Ошибка обновления компонентов привычек:', error);
-    UI.showToast('Не удалось обновить данные', 'error');
-  }
-}
 
 // ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
@@ -104,11 +16,11 @@ function initHabits() {
   console.log('🔁 Инициализация модуля привычек...');
   initHabitModal();
   initCalendarListeners();
-
   console.log('✅ Модуль привычек инициализирован');
 }
 
 function initHabitModal() {
+  // === Создание новой привычки ===
   const btnAdd = document.getElementById('btn-add-habit');
   const btnSave = document.getElementById('habit-save');
   const btnCancel = document.getElementById('habit-cancel');
@@ -120,6 +32,19 @@ function initHabitModal() {
   if (modal) {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) UI.hideModal('habit-modal');
+    });
+  }
+
+  // === Редактирование существующей привычки ===
+  const editSaveBtn = document.getElementById('edit-habit-save');
+  const editCancelBtn = document.getElementById('edit-habit-cancel');
+  const editModal = document.getElementById('edit-habit-modal');
+
+  if (editSaveBtn) editSaveBtn.addEventListener('click', UI.debounce(saveEditedHabit, 300));
+  if (editCancelBtn) editCancelBtn.addEventListener('click', () => UI.hideModal('edit-habit-modal'));
+  if (editModal) {
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) UI.hideModal('edit-habit-modal');
     });
   }
 }
@@ -139,14 +64,17 @@ function initCalendarListeners() {
     if (el) el.addEventListener('click', handler);
   });
 
-  // Активная кнопка вида
   updateViewButtons();
 }
 
 // ==================== МОДАЛКА ПРИВЫЧКИ ====================
 
 function showHabitModal() {
-  if (!ensureAuthenticated()) return;
+  if (!ensureAuthenticated()) {
+    UI.showToast('Требуется авторизация', 'warning');
+    showAuthScreen();
+    return;
+  }
 
   const titleInput = document.getElementById('habit-title');
   const dailyCheckbox = document.getElementById('habit-daily');
@@ -157,6 +85,8 @@ function showHabitModal() {
   UI.showModal('habit-modal');
 }
 
+let currentEditHabitId = null;
+
 async function saveHabitHandler() {
   const titleInput = document.getElementById('habit-title');
   const dailyCheckbox = document.getElementById('habit-daily');
@@ -165,6 +95,7 @@ async function saveHabitHandler() {
   if (!titleInput || !saveBtn) return;
 
   const title = titleInput.value.trim();
+  const description = document.getElementById('habit-description')?.value.trim() || '';
   const isDaily = dailyCheckbox?.checked ?? true;
 
   if (!title) return UI.showToast('Введите название привычки', 'error');
@@ -176,7 +107,7 @@ async function saveHabitHandler() {
     const res = await Auth.safeFetch('/api/habits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, daily: isDaily })
+      body: JSON.stringify({ title, description, daily: isDaily })
     });
 
     UI.hideModal('habit-modal');
@@ -185,6 +116,59 @@ async function saveHabitHandler() {
     setTimeout(refreshHabitViews, 500);
   } catch (error) {
     handleApiError(error, 'Создание привычки');
+  } finally {
+    UI.setButtonLoading(saveBtn, false);
+  }
+}
+
+// ==================== РЕДАКТИРОВАНИЕ ПРИВЫЧКИ ====================
+
+function showEditHabitModal(habitId, currentTitle) {
+  if (!ensureAuthenticated()) {
+    UI.showToast('Требуется авторизация', 'warning');
+    showAuthScreen();
+    return;
+  }
+
+  const input = document.getElementById('edit-habit-title');
+  const modal = document.getElementById('edit-habit-modal');
+
+  if (!input || !modal) {
+    UI.showToast('Модальное окно редактирования не найдено', 'error');
+    return;
+  }
+
+  input.value = currentTitle;
+  currentEditHabitId = habitId;
+  UI.showModal('edit-habit-modal');
+  setTimeout(() => input.focus(), 100);
+}
+
+async function saveEditedHabit() {
+  const input = document.getElementById('edit-habit-title');
+  const saveBtn = document.getElementById('edit-habit-save');
+
+  if (!input || !currentEditHabitId) return;
+
+  const newTitle = input.value.trim();
+  if (!newTitle || newTitle.length < 2) {
+    return UI.showToast('Название должно содержать минимум 2 символа', 'error');
+  }
+
+  UI.setButtonLoading(saveBtn, true);
+  try {
+    await Auth.safeFetch(`/api/habits/${currentEditHabitId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle })
+    });
+
+    UI.hideModal('edit-habit-modal');
+    UI.showToast('Привычка обновлена!', 'success');
+    API.clearCache();
+    refreshHabitViews(); // обновит и трекер, и список
+  } catch (error) {
+    handleApiError(error, 'Обновление привычки');
   } finally {
     UI.setButtonLoading(saveBtn, false);
   }
@@ -200,378 +184,38 @@ async function loadAndRenderHabitsList() {
 
   try {
     const habits = await API.loadHabits(true);
-    renderHabitsList(habits);
+    renderHabitsList(habits, toggleTodayHabit, deleteHabit, exportHabitData);
   } catch (error) {
     handleApiError(error, 'Загрузка привычек');
     renderErrorState('habits-list-container', error.message, loadAndRenderHabitsList);
   }
 }
 
-function renderHabitsList(habits) {
-  const container = document.getElementById('habits-list-container');
-  if (!container) return;
-
-  const todayStr = formatLocalDate(new Date());
-
-  if (!habits?.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <p>У вас пока нет привычек.</p>
-        <p style="margin-top:10px;color:var(--accent);">Нажмите "Добавить привычку", чтобы начать!</p>
-      </div>
-    `;
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  habits.forEach(habit => {
-    const checkins = new Set(habit.checkin_dates || []);
-    const isTodayChecked = checkins.has(todayStr);
-    const currentStreak = calculateCurrentStreak(checkins);
-    const maxStreak = calculateMaxStreak(checkins);
-    const streakPercentage = maxStreak ? Math.min((currentStreak / maxStreak) * 100, 100) : 0;
-
-    const card = document.createElement('div');
-    card.className = 'habit-card fade-in';
-    card.dataset.habitId = habit.id;
-    card.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;">
-        <div class="habit-title">${habit.title}</div>
-        <div style="display:flex;gap:4px;">
-          <button class="btn-toggle-habit button-secondary" style="font-size:12px;padding:4px 8px;" title="Детали">📊</button>
-          <button class="btn-delete-habit button-warning" style="font-size:12px;padding:4px 8px;" title="Удалить">🗑</button>
-        </div>
-      </div>
-      <div class="habit-stats">
-        <span>${isTodayChecked ? '✅ Сегодня выполнено' : '⏳ Сегодня не выполнено'}</span>
-        <button class="btn-toggle-today ${isTodayChecked ? 'button-secondary' : 'button-success'}" style="font-size:11px;padding:4px 8px;">
-          ${isTodayChecked ? 'Отменить' : 'Выполнить'}
-        </button>
-      </div>
-      <div class="habit-stats" style="display:flex;justify-content:space-between;margin:8px 0;">
-        <span>🔥 Текущая цепочка: <strong>${currentStreak}</strong> дн.</span>
-        <span>🥇 Рекорд: <strong>${maxStreak}</strong> дн.</span>
-      </div>
-      <div class="habit-stats" style="margin-bottom:8px;">📅 Всего дней: <strong>${checkins.size}</strong></div>
-      <div class="progress-bar" style="margin:8px 0;"><div class="progress-fill" style="width:${streakPercentage}%"></div></div>
-      <div class="habit-details" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📅 Дни выполнения за последнюю неделю:</div>
-        <div id="habit-week-${habit.id}" style="display:flex;gap:4px;margin-bottom:12px;"></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
-          <span>Создано: ${formatDate(habit.created_at)}</span>
-          <button class="btn-export-habit" style="background:none;border:none;color:var(--accent);cursor:pointer;">📥 Экспорт данных</button>
-        </div>
-      </div>
-    `;
-    fragment.appendChild(card);
-    setTimeout(() => renderHabitWeekDays(habit.id, checkins), 0);
-  });
-
-  container.innerHTML = '';
-  container.appendChild(fragment);
-  initHabitCardHandlers();
-}
-
-function renderHabitWeekDays(habitId, checkins) {
-  const container = document.getElementById(`habit-week-${habitId}`);
-  if (!container) return;
-
-  const now = new Date();
-  container.innerHTML = '';
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-    const dateStr = formatLocalDate(date);
-    const dayName = DAY_NAMES[date.getDay() === 0 ? 6 : date.getDay() - 1];
-    const isChecked = checkins.has(dateStr);
-
-    const el = document.createElement('div');
-    el.style.cssText = `
-      width: 28px; height: 28px; border-radius: 6px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 9px; cursor: pointer;
-      background: ${isChecked ? 'var(--accent)' : 'var(--border)'};
-      color: ${isChecked ? '#020617' : 'var(--text)'};
-    `;
-    el.innerHTML = `<div>${dayName}</div><div style="font-weight:bold;font-size:10px;">${date.getDate()}</div>`;
-    el.addEventListener('click', () => toggleHabitCheckin(habitId, dateStr, !isChecked));
-    container.appendChild(el);
-  }
-}
-
-// ==================== КАЛЕНДАРЬ ====================
-
 async function refreshTracker() {
   if (!ensureAuthenticated()) {
-    const container = document.getElementById('calendar-container');
-    if (container) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <h3>Требуется авторизация</h3>
-          <p style="color: var(--muted);">Для просмотра трекера необходимо войти в систему</p>
-        </div>
-      `;
-    }
+    renderUnauthenticatedState('calendar-container');
     return;
   }
 
   const habits = await API.loadHabits(true);
-  renderTodayHabits(habits);
-  renderCalendar(habits);
-
-}
-
-function renderTodayHabits(habits) {
-  const container = document.getElementById('today-habits');
-  if (!container) return;
-
-  const todayStr = formatLocalDate(new Date());
-  if (!habits?.length) {
-    container.innerHTML = '<p class="empty-state">Нет активных привычек</p>';
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  habits.forEach(habit => {
-    const isChecked = new Set(habit.checkin_dates || []).has(todayStr);
-    const wrapper = document.createElement('div');
-    wrapper.className = 'slide-down';
-    wrapper.style.cssText = `display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px;background-color:rgba(30,41,59,0.5);border-radius:8px;`;
-    const btn = document.createElement('button');
-    btn.className = isChecked ? 'button-success' : 'button-accent';
-    btn.textContent = isChecked ? '✅ Выполнено' : '☑ Выполнить';
-    btn.addEventListener('click', UI.debounce(() => toggleTodayHabit(habit.id, habit.title, isChecked), 300));
-    wrapper.innerHTML = `<span style="flex:1;">${habit.title}</span>`;
-    wrapper.appendChild(btn);
-    fragment.appendChild(wrapper);
-  });
-
-  container.innerHTML = '';
-  container.appendChild(fragment);
-}
-
-function renderCalendar(habits) {
-  const container = document.getElementById('calendar-container');
-  if (!container) return;
-
+  renderHabitsCardsAboveCalendar(
+    habits,
+    toggleTodayHabit,
+    deleteHabit,
+    showEditHabitModal // ← передаём функцию как коллбэк
+  );
   const days = getDaysForView();
-  const todayStr = formatLocalDate(new Date());
-
-  // Обновляем заголовок
-  const periodTitle = document.getElementById('calendar-period-title');
-  if (periodTitle) {
-    if (calendarView === 'week') {
-      const first = days[0], last = days[days.length - 1];
-      if (first.getMonth() === last.getMonth()) {
-        periodTitle.textContent = `${first.getDate()}-${last.getDate()} ${SHORT_MONTH_NAMES[first.getMonth()]} ${first.getFullYear()}`;
-      } else {
-        periodTitle.textContent = `${first.getDate()} ${SHORT_MONTH_NAMES[first.getMonth()]} – ${last.getDate()} ${SHORT_MONTH_NAMES[last.getMonth()]} ${first.getFullYear()}`;
-      }
-    } else {
-      const d = new Date(currentPeriod);
-      periodTitle.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-    }
-  }
-
-  if (!habits?.length) {
-    container.innerHTML = '<p class="empty-state">Добавьте привычки, чтобы увидеть календарь</p>';
-    return;
-  }
-
-  // Создаём адаптивную сетку
-  const calendarWrapper = document.createElement('div');
-  calendarWrapper.className = 'calendar-responsive-wrapper';
-  
-  const grid = document.createElement('div');
-  grid.className = 'calendar-responsive-grid';
-  grid.style.setProperty('--days-count', days.length);
-
-  // Заголовок дней
-  const daysHeader = document.createElement('div');
-  daysHeader.className = 'calendar-days-header';
-  
-  // Ячейка для названий привычек
-  const habitLabelCell = document.createElement('div');
-  habitLabelCell.className = 'calendar-habit-label';
-  habitLabelCell.textContent = 'Привычка';
-  daysHeader.appendChild(habitLabelCell);
-
-  // Дни недели/месяца
-  days.forEach(date => {
-    const dateLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const isToday = formatLocalDate(dateLocal) === todayStr;
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    
-    const dayCell = document.createElement('div');
-    dayCell.className = 'calendar-day-header';
-    dayCell.innerHTML = `
-      <div class="day-number ${isToday ? 'today' : ''}">${date.getDate()}</div>
-      <div class="day-name">${DAY_NAMES[date.getDay()]}</div>
-    `;
-    dayCell.style.color = isWeekend ? 'var(--warning)' : 'var(--text)';
-    daysHeader.appendChild(dayCell);
-  });
-  
-  grid.appendChild(daysHeader);
-
-  // Строки привычек
-  habits.forEach((habit, rowIndex) => {
-    const row = document.createElement('div');
-    row.className = 'calendar-habit-row';
-    
-    // Название привычки
-    const habitLabel = document.createElement('div');
-    habitLabel.className = 'calendar-habit-label';
-    habitLabel.textContent = habit.title;
-    habitLabel.title = habit.title;
-    row.appendChild(habitLabel);
-    
-    const checkins = new Set(habit.checkin_dates || []);
-    
-    // Ячейки дней
-    days.forEach(date => {
-      const dateLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      const dayStr = formatLocalDate(dateLocal);
-      const isChecked = checkins.has(dayStr);
-      const isToday = dayStr === todayStr;
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-      
-      const dayCell = document.createElement('div');
-      dayCell.className = `calendar-day-cell ${isChecked ? 'checked' : ''} ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`;
-      dayCell.dataset.habit = habit.id;
-      dayCell.dataset.date = dayStr;
-      dayCell.title = `${FULL_DAY_NAMES[date.getDay()]}, ${date.getDate()} ${MONTH_NAMES[date.getMonth()].toLowerCase()} ${date.getFullYear()} — ${habit.title}`;
-      
-      if (isChecked) {
-        dayCell.innerHTML = '<div class="marker">✓</div>';
-      } else if (isToday) {
-        dayCell.textContent = date.getDate();
-      } else {
-        dayCell.textContent = date.getDate();
-        dayCell.style.opacity = '0.6';
-      }
-      
-      dayCell.addEventListener('click', UI.debounce(() => 
-        toggleHabitCheckin(habit.id, dayStr, !isChecked), 300));
-      
-      row.appendChild(dayCell);
-    });
-    
-    grid.appendChild(row);
-  });
-
-  container.innerHTML = '';
-  calendarWrapper.appendChild(grid);
-  container.appendChild(calendarWrapper);
-  
-  // Добавляем стили
-  addCalendarStyles();
-  
-  // Удаляем старый обработчик ресайза и добавляем новый
-  if (window.calendarResizeHandler) {
-    window.removeEventListener('resize', window.calendarResizeHandler);
-  }
-  
-  window.calendarResizeHandler = UI.debounce(() => {
-    updateCalendarResponsiveWidth();
-  }, 150);
-  
-  window.addEventListener('resize', window.calendarResizeHandler);
-  
-  // Инициализируем ширину
-  setTimeout(() => updateCalendarResponsiveWidth(), 100);
-}
-
-function updateCalendarResponsiveWidth() {
-  const grid = document.querySelector('.calendar-responsive-grid');
-  if (!grid) return;
-  
-  const container = document.getElementById('calendar-container');
-  if (!container) return;
-  
-  // Проверяем ширину контейнера
-  const containerWidth = container.clientWidth;
-  const dayCells = grid.querySelectorAll('.calendar-day-cell, .calendar-day-header');
-  
-  if (containerWidth < 768) {
-    // Мобильный режим - уменьшаем размер ячеек
-    dayCells.forEach(cell => {
-      cell.style.width = '28px';
-      cell.style.height = '28px';
-      cell.style.fontSize = '10px';
-    });
-    
-    const habitLabels = grid.querySelectorAll('.calendar-habit-label');
-    habitLabels.forEach(label => {
-      label.style.fontSize = '12px';
-      label.style.padding = '6px 4px';
-    });
-  } else if (containerWidth < 1024) {
-    // Планшетный режим
-    dayCells.forEach(cell => {
-      cell.style.width = '32px';
-      cell.style.height = '32px';
-      cell.style.fontSize = '12px';
-    });
-  } else {
-    // Десктопный режим
-    dayCells.forEach(cell => {
-      cell.style.width = '36px';
-      cell.style.height = '36px';
-      cell.style.fontSize = '14px';
-    });
-  }
+  renderCalendar(habits, days, calendarView, currentPeriod, toggleHabitCheckin);
 }
 
 // ==================== ДЕЙСТВИЯ ====================
 
-/**
- * Обновляет все компоненты, связанные с привычками
- */
-async function refreshAllHabitComponents() {
-  console.log('🔄 Обновление всех компонентов привычек...');
-  try {
-    const activePage = getCurrentActivePage();
-    const freshHabits = await API.loadHabits(true);
-
-    switch (activePage) {
-      case 'habits-list':
-        renderHabitsList(freshHabits);
-        break;
-      case 'habits-tracker':
-        renderTodayHabits(freshHabits);
-        renderCalendar(freshHabits);
-        break;
-      case 'home':
-        renderTodayHabits(freshHabits);
-        break;
-      default:
-        const containers = [
-          { id: 'calendar-container', fn: () => renderCalendar(freshHabits) },
-          { id: 'today-habits', fn: () => renderTodayHabits(freshHabits) },
-          { id: 'habits-list-container', fn: () => renderHabitsList(freshHabits) }
-        ];
-        containers.forEach(({ id, fn }) => {
-          const el = document.getElementById(id);
-          if (el && getComputedStyle(el).display !== 'none') fn();
-        });
-        break;
-    }
-    console.log('✅ Все компоненты привычек обновлены');
-  } catch (error) {
-    console.error('❌ Ошибка обновления компонентов:', error);
-  }
-}
-
 async function toggleTodayHabit(habitId, habitTitle, isCurrentlyChecked) {
-  // Используем локальную дату
-  const todayStr = new Date().toLocaleDateString('en-CA');
-  
-  // НАЙТИ КНОПКУ И НЕМЕДЛЕННО ОБНОВИТЬ ЕЁ
+  const todayStr = formatLocalDate(new Date());
   const button = document.querySelector(`.habit-card[data-habit-id="${habitId}"] .btn-toggle-today`);
   const newIsChecked = !isCurrentlyChecked;
-  
+
   if (button) {
-    // Мгновенный фидбэк
     button.disabled = true;
     button.className = `btn-toggle-today ${newIsChecked ? 'button-secondary' : 'button-success'}`;
     button.textContent = newIsChecked ? 'Отменить' : 'Выполнить';
@@ -594,30 +238,21 @@ async function toggleTodayHabit(habitId, habitTitle, isCurrentlyChecked) {
       : `День отменен для "${habitTitle}"`;
     UI.showToast(message, newIsChecked ? 'success' : 'info');
 
-    // Очищаем кэш
     API.clearCache();
-
-    // Обновляем ВСЁ
-    await refreshAllHabitComponents();
+    await refreshHabitViews();
 
   } catch (error) {
     console.error('Toggle habit error:', error);
-    
-    // ОТКАТ UI при ошибке
+
     if (button) {
       button.className = `btn-toggle-today ${isCurrentlyChecked ? 'button-secondary' : 'button-success'}`;
       button.textContent = isCurrentlyChecked ? 'Отменить' : 'Выполнить';
     }
-    
+
     UI.showToast('Ошибка обновления привычки: ' + error.message, 'error');
-    
+
     if (error.status === 401) {
-      const authScreen = document.getElementById('auth-screen');
-      const appContent = document.getElementById('app-content');
-      if (authScreen && appContent) {
-        authScreen.style.display = 'block';
-        appContent.style.display = 'none';
-      }
+      showAuthScreen();
     }
   } finally {
     if (button) {
@@ -626,12 +261,14 @@ async function toggleTodayHabit(habitId, habitTitle, isCurrentlyChecked) {
   }
 }
 
-async function toggleHabitCheckin(habitId, dateStr, shouldCheck) {
-  if (!ensureAuthenticated()) return;
+async function toggleHabitCheckin(habitId, dateStr, shouldCheck, habitTitle) {
+  if (!ensureAuthenticated()) {
+    UI.showToast('Требуется авторизация', 'warning');
+    showAuthScreen();
+    return;
+  }
 
-  // 🔒 ЗАПРЕТ НА БУДУЩИЕ ДНИ
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (dateStr > todayStr) {
+  if (isFutureDate(dateStr)) {
     UI.showToast('Нельзя отмечать привычки в будущем', 'error');
     return;
   }
@@ -645,6 +282,7 @@ async function toggleHabitCheckin(habitId, dateStr, shouldCheck) {
     });
     API.clearCache();
     await refreshHabitViews();
+    UI.showToast(`${shouldCheck ? 'Отмечено' : 'Отменено'} для "${habitTitle}"`, shouldCheck ? 'success' : 'info');
   } catch (error) {
     handleApiError(error, 'Обновление отметки');
   }
@@ -657,7 +295,16 @@ async function deleteHabit(habitId, habitTitle) {
   try {
     await Auth.safeFetch(`/api/habits/${habitId}`, { method: 'DELETE' });
     API.clearCache();
-    await refreshHabitViews();
+    
+    // Проверяем, находимся ли мы на странице трекера
+    const isOnTrackerPage = document.getElementById('page-habits-tracker')?.style.display !== 'none';
+    
+    if (isOnTrackerPage) {
+      await refreshTracker(); // ← перерисует и карточки, и календарь
+    } else {
+      await refreshHabitViews(); // ← для других страниц
+    }
+    
     UI.showToast(`Привычка "${habitTitle}" удалена`, 'success');
   } catch (error) {
     handleApiError(error, 'Удаление привычки');
@@ -718,8 +365,8 @@ function updatePeriodTitle() {
       titleEl.textContent = `${first.getDate()} ${SHORT_MONTH_NAMES[first.getMonth()]} – ${last.getDate()} ${SHORT_MONTH_NAMES[last.getMonth()]} ${first.getFullYear()}`;
     }
   } else {
-    const d = new Date(currentPeriod);
-    titleEl.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+    // ИСПРАВЛЕНО: используем currentPeriod.getMonth()
+    titleEl.textContent = `${MONTH_NAMES[currentPeriod.getMonth()]} ${currentPeriod.getFullYear()}`;
   }
 }
 
@@ -746,10 +393,71 @@ function getDaysForView() {
   }
 }
 
+// ==================== ОБНОВЛЕНИЕ ====================
+
+/**
+ * Обновляет все компоненты, связанные с привычками
+ */
+async function refreshHabitViews() {
+  try {
+    const activePage = getCurrentActivePage();
+    const freshHabits = await API.loadHabits(true);
+
+    switch (activePage) {
+      case 'habits-list':
+        renderHabitsList(freshHabits, toggleTodayHabit, deleteHabit, exportHabitData);
+        break;
+      case 'habits-tracker':
+        renderTodayHabits(freshHabits, toggleTodayHabit);
+        const days = getDaysForView();
+        renderCalendar(freshHabits, days, calendarView, currentPeriod, toggleHabitCheckin);
+        break;
+      case 'home':
+        renderTodayHabits(freshHabits, toggleTodayHabit);
+        break;
+      default:
+        // Обновляем все возможные контейнеры
+        const containers = [
+          { id: 'calendar-container', fn: () => {
+              const days = getDaysForView();
+              renderCalendar(freshHabits, days, calendarView, currentPeriod, toggleHabitCheckin);
+            }
+          },
+          { id: 'today-habits', fn: () => renderTodayHabits(freshHabits, toggleTodayHabit) },
+          { id: 'habits-list-container', fn: () => renderHabitsList(freshHabits, toggleTodayHabit, deleteHabit, exportHabitData) }
+        ];
+        containers.forEach(({ id, fn }) => {
+          const el = document.getElementById(id);
+          if (el && getComputedStyle(el).display !== 'none') fn();
+        });
+        break;
+    }
+  } catch (error) {
+    console.error('❌ Ошибка обновления компонентов:', error);
+    UI.showToast('Не удалось обновить данные', 'error');
+  }
+}
+
+function getCurrentActivePage() {
+  const activeSidebarItem = document.querySelector('.sidebar-item.active');
+  if (activeSidebarItem) return activeSidebarItem.dataset.page;
+
+  const pages = ['home', 'goals', 'habits-list', 'habits-tracker'];
+  for (const page of pages) {
+    const el = document.getElementById(`page-${page}`);
+    if (el && el.style.display !== 'none') return page;
+  }
+  return 'home';
+}
+
 // ==================== ЭКСПОРТ И СТИЛИ ====================
 
 async function exportHabitData(habitId, habitTitle) {
-  if (!ensureAuthenticated()) return;
+  if (!ensureAuthenticated()) {
+    UI.showToast('Требуется авторизация', 'warning');
+    showAuthScreen();
+    return;
+  }
   try {
     const habits = await API.loadHabits(true);
     const habit = habits.find(h => h.id === habitId);
@@ -768,7 +476,11 @@ async function exportHabitData(habitId, habitTitle) {
 }
 
 async function exportAllHabitsData() {
-  if (!ensureAuthenticated()) return;
+  if (!ensureAuthenticated()) {
+    UI.showToast('Требуется авторизация', 'warning');
+    showAuthScreen();
+    return;
+  }
   try {
     const habits = await API.loadHabits(true);
     if (!habits?.length) return UI.showToast('Нет данных', 'warning');
@@ -781,7 +493,7 @@ async function exportAllHabitsData() {
         created_at: h.created_at,
         total_checkins: h.checkin_dates?.length || 0,
         checkins: h.checkin_dates || [],
-        current_streak: calculateCurrentStreak(h.checkin_dates || []),
+        current_streak: calculateCurrentStreak(new Set(h.checkin_dates || [])),
         max_streak: calculateMaxStreak(h.checkin_dates || [])
       }))
     };
@@ -805,313 +517,13 @@ function downloadJson(data, filename) {
 
 // ==================== УТИЛИТЫ ====================
 
-function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
-function calculateCurrentStreak(checkins) {
-  if (!checkins || !checkins.length) return 0;
-  
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const checkinSet = new Set(checkins);
-  
-  // Если сегодня не отмечено — серия 0
-  if (!checkinSet.has(todayStr)) return 0;
-  
-  let streak = 1;
-  let currentDate = new Date(today);
-  
-  // Идём назад по дням
-  for (let i = 1; i < 365; i++) {
-    currentDate.setDate(currentDate.getDate() - 1);
-    const dateStr = currentDate.toISOString().slice(0, 10);
-    
-    if (checkinSet.has(dateStr)) {
-      streak++;
-    } else {
-      break; // серия прервана
-    }
+function showAuthScreen() {
+  const authScreen = document.getElementById('auth-screen');
+  const appContent = document.getElementById('app-content');
+  if (authScreen && appContent) {
+    authScreen.style.display = 'block';
+    appContent.style.display = 'none';
   }
-  
-  return streak;
-}
-
-function calculateMaxStreak(checkins) {
-  if (!checkins || !checkins.length) return 0;
-  
-  const sorted = [...checkins].sort(); // сортируем по возрастанию
-  let maxStreak = 1;
-  let currentStreak = 1;
-  
-  for (let i = 1; i < sorted.length; i++) {
-    const prevDate = new Date(sorted[i - 1]);
-    const currDate = new Date(sorted[i]);
-    const diffTime = currDate - prevDate;
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 1) {
-      // Последовательные дни
-      currentStreak++;
-    } else if (diffDays > 1) {
-      // Пропуск — обновляем максимум и сбрасываем
-      maxStreak = Math.max(maxStreak, currentStreak);
-      currentStreak = 1;
-    }
-    // Если diffDays === 0 — дубликат, игнорируем
-  }
-  
-  return Math.max(maxStreak, currentStreak);
-}
-
-function addCalendarStyles() {
-  if (document.getElementById('calendar-styles')) return;
-  
-  const style = document.createElement('style');
-  style.id = 'calendar-styles';
-  style.textContent = `
-    /* ==================== КАЛЕНДАРЬ ==================== */
-    .calendar-responsive-wrapper {
-      width: 100%;
-      overflow-x: auto;
-      overflow-y: hidden;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: rgba(15, 23, 42, 0.9);
-      -webkit-overflow-scrolling: touch;
-    }
-    
-    .calendar-responsive-grid {
-      display: grid;
-      grid-template-columns: minmax(120px, 180px) repeat(var(--days-count, 7), 1fr);
-      min-width: fit-content;
-      gap: 1px;
-      background: var(--border);
-    }
-    
-    /* Заголовок дней */
-    .calendar-days-header {
-      display: contents;
-    }
-    
-    .calendar-day-header,
-    .calendar-habit-label {
-      background: rgba(15, 23, 42, 0.95);
-      padding: 10px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      border: none;
-      position: sticky;
-      left: 0;
-      z-index: 2;
-    }
-    
-    .calendar-habit-label {
-      justify-content: flex-start;
-      text-align: right;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-height: 44px;
-    }
-    
-    .calendar-day-header {
-      min-height: 44px;
-      background: rgba(30, 41, 59, 0.95);
-      z-index: 1;
-    }
-    
-    .day-number {
-      font-weight: 500;
-      font-size: 14px;
-    }
-    
-    .day-number.today {
-      color: var(--accent);
-      font-weight: bold;
-    }
-    
-    .day-name {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    
-    /* Строки привычек */
-    .calendar-habit-row {
-      display: contents;
-    }
-    
-    .calendar-day-cell {
-      background: rgba(30, 41, 59, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: none;
-      aspect-ratio: 1;
-      min-width: 28px;
-      min-height: 28px;
-      position: relative;
-    }
-    
-    .calendar-day-cell:hover {
-      background: rgba(56, 189, 248, 0.2);
-      transform: scale(1.05);
-      z-index: 1;
-    }
-    
-    .calendar-day-cell.checked {
-      background: rgba(56, 189, 248, 0.3);
-      color: white;
-    }
-    
-    .calendar-day-cell.checked .marker {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-    }
-    
-    .calendar-day-cell.today:not(.checked) {
-      border: 2px solid var(--accent);
-      font-weight: bold;
-    }
-    
-    .calendar-day-cell.weekend:not(.checked) {
-      color: var(--muted-dark);
-    }
-    
-    /* Адаптивные стили */
-    @media (max-width: 768px) {
-      .calendar-responsive-grid {
-        grid-template-columns: minmax(100px, 1fr) repeat(var(--days-count, 7), 1fr);
-      }
-      
-      .calendar-habit-label {
-        font-size: 12px;
-        padding: 6px 4px;
-      }
-      
-      .calendar-day-header {
-        padding: 6px 4px;
-      }
-      
-      .day-number {
-        font-size: 12px;
-      }
-      
-      .day-name {
-        font-size: 10px;
-      }
-      
-      .calendar-day-cell {
-        min-width: 24px;
-        min-height: 24px;
-        font-size: 11px;
-      }
-      
-      .calendar-day-cell.checked .marker {
-        width: 16px;
-        height: 16px;
-        font-size: 10px;
-      }
-    }
-    
-    @media (max-width: 480px) {
-      .calendar-responsive-wrapper {
-        border-radius: 6px;
-      }
-      
-      .calendar-responsive-grid {
-        grid-template-columns: minmax(80px, 1fr) repeat(var(--days-count, 7), 1fr);
-        gap: 0.5px;
-      }
-      
-      .calendar-habit-label {
-        font-size: 11px;
-        padding: 4px;
-        min-height: 36px;
-      }
-      
-      .calendar-day-header {
-        padding: 4px;
-        min-height: 36px;
-      }
-      
-      .day-number {
-        font-size: 11px;
-      }
-      
-      .day-name {
-        font-size: 9px;
-      }
-      
-      .calendar-day-cell {
-        min-width: 20px;
-        min-height: 20px;
-        font-size: 10px;
-      }
-      
-      .calendar-day-cell.checked .marker {
-        width: 14px;
-        height: 14px;
-        font-size: 9px;
-      }
-    }
-    
-    /* Для очень узких экранов */
-    @media (max-width: 360px) {
-      .calendar-responsive-grid {
-        grid-template-columns: minmax(70px, 1fr) repeat(var(--days-count, 7), 1fr);
-      }
-      
-      .calendar-habit-label {
-        font-size: 10px;
-      }
-      
-      .calendar-day-cell {
-        min-width: 18px;
-        min-height: 18px;
-        font-size: 9px;
-      }
-    }
-    
-    /* Прокрутка для календаря */
-    .calendar-responsive-wrapper::-webkit-scrollbar {
-      height: 8px;
-    }
-    
-    .calendar-responsive-wrapper::-webkit-scrollbar-track {
-      background: var(--border);
-      border-radius: 4px;
-    }
-    
-    .calendar-responsive-wrapper::-webkit-scrollbar-thumb {
-      background: var(--accent);
-      border-radius: 4px;
-    }
-    
-    .calendar-responsive-wrapper::-webkit-scrollbar-thumb:hover {
-      background: var(--accent-strong);
-    }
-  `;
-  
-  document.head.appendChild(style);
 }
 
 function renderUnauthenticatedState(containerId) {
@@ -1154,13 +566,12 @@ function handleApiError(error, context = 'Запрос') {
 // ==================== ЭКСПОРТ ====================
 
 export {
-  // Инициализация
   initHabits,
-  // Основные функции
   loadAndRenderHabitsList,
   refreshTracker,
   showHabitModal,
   setCalendarView,
   navigateCalendar,
-  exportAllHabitsData
+  exportAllHabitsData,
+  toggleTodayHabit
 };
