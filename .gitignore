@@ -6,3 +6,5 @@ data/
 *.db
 *.db-shm
 *.db-wal
+ANALYSIS.md
+FIXES_APPLIED.md

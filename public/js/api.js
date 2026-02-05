@@ -372,23 +372,6 @@ export async function decomposeGoalAI(goalText) {
   }
 }
 
-// ==================== AI INTERPRETATION ====================
-
-export async function interpretAI(text) {
-  ensureAuthenticated();
-
-  const response = await makeApiRequest('/api/ai-chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: text.trim()
-    })
-  });
-
-  return response;
-}
-
-
 // ==================== ЭКСПОРТ УТИЛИТ ====================
 
 export function clearCache() {

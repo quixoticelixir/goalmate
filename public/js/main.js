@@ -4,9 +4,14 @@ import * as API from './api.js';
 import * as Goals from './goals.js';
 import * as Habits from './habits.js';
 import * as Stats from './stats.js';
+import * as Profile from './profile.js';
 
 // ==================== СОСТОЯНИЕ ====================
 let currentView = 'ai-chat';
+
+// ==================== EVENT LISTENER REFERENCES (для предотвращения утечек памяти) ====================
+let todayTasksClickHandler = null;
+let aiChatListenersAttached = false;
 
 // ==================== КОНФИГУРАЦИЯ НАВИГАЦИИ ====================
 const PAGE_CONFIG = {
@@ -34,6 +39,11 @@ const PAGE_CONFIG = {
     title: 'Мои привычки',
     requiresAuth: true,
     onLoad: () => Habits.loadAndRenderHabitsList()
+  },
+  'profile': {
+    title: 'Профиль',
+    requiresAuth: true,
+    onLoad: () => Profile.loadProfile()
   }
 };
 
@@ -130,7 +140,8 @@ function updateNavigationState(pageId) {
 // ==================== AI ЧАТ ====================
 function initAIChat() {
   console.log('🤖 AI чат инициализирован');
-  updateDashboardStats();
+  // Используем оптимизированную функцию для обновления всех счетчиков
+  updateAllStats();
   attachAIChatListeners();
   updateTodayTasks();
 }
@@ -153,32 +164,43 @@ async function chatWithGiga(message) {
 
 
 
-async function updateDashboardStats() {
-
+// Объединенная функция для загрузки данных (избегаем дублирования запросов)
+async function loadStatsData() {
   try {
-    const [goals, habits] = await Promise.all([
-      API.loadGoals(true, 'all'), // Загружаем все цели для общей статистики
-      API.loadHabits(true)       // Загружаем все привычки для общей статистики
+    const [allGoals, activeGoals, allHabits] = await Promise.all([
+      API.loadGoals(true, 'all'),    // Все цели для dashboard stats
+      API.loadGoals(true, 'active'), // Активные цели для sidebar counters
+      API.loadHabits(true)           // Все привычки (используются в обоих местах)
     ]);
+    
+    return { allGoals, activeGoals, allHabits };
+  } catch (error) {
+    console.error('Ошибка загрузки данных статистики:', error);
+    throw error;
+  }
+}
 
-    // Теперь безопасно пытаемся обновить элементы
-    // Пример: обновление счетчиков целей
-    const activeGoalsCount = goals.filter(g => !g.completed && !g.archived).length;
-    const completedGoalsCount = goals.filter(g => g.completed).length;
-    const totalGoalsCount = goals.length;
+async function updateDashboardStats() {
+  try {
+    const { allGoals, allHabits } = await loadStatsData();
+
+    // Обновление счетчиков целей
+    const activeGoalsCount = allGoals.filter(g => !g.completed && !g.archived).length;
+    const completedGoalsCount = allGoals.filter(g => g.completed).length;
+    const totalGoalsCount = allGoals.length;
 
     // Обновляем элементы, если они существуют
-    const activeGoalsEl = document.getElementById('active-goals-count'); // Убедитесь, что такой ID есть в index.html, если вы хотите отображать счетчики
+    const activeGoalsEl = document.getElementById('active-goals-count');
     if (activeGoalsEl) activeGoalsEl.textContent = activeGoalsCount;
     const completedGoalsEl = document.getElementById('completed-goals-count');
     if (completedGoalsEl) completedGoalsEl.textContent = completedGoalsCount;
     const totalGoalsEl = document.getElementById('total-goals-count');
     if (totalGoalsEl) totalGoalsEl.textContent = totalGoalsCount;
 
-    // Пример: обновление счетчиков привычек
-    const totalHabitsCount = habits.length;
+    // Обновление счетчиков привычек
+    const totalHabitsCount = allHabits.length;
     const today = new Date().toISOString().slice(0, 10);
-    const completedTodayCount = habits.filter(h => h.checkin_dates?.includes(today)).length;
+    const completedTodayCount = allHabits.filter(h => h.checkin_dates?.includes(today)).length;
 
     const totalHabitsEl = document.getElementById('total-habits-count');
     if (totalHabitsEl) totalHabitsEl.textContent = totalHabitsCount;
@@ -189,19 +211,13 @@ async function updateDashboardStats() {
 
   } catch (error) {
     console.error('Ошибка статистики:', error);
-    // Не показываем тост ошибки здесь, так как это может происходить часто и раздражать
-    // Но можно логировать или показывать в UI, если есть место для статистики
-    // UI.showToast('Не удалось обновить статистику', 'error');
   }
 }
 
-// Новая функция для обновления счетчиков в сайдбаре
+// Функция для обновления счетчиков в сайдбаре
 async function updateAllCounters() {
   try {
-    const [activeGoals, allHabits] = await Promise.all([
-      API.loadGoals(true, 'active'), // только активные цели
-      API.loadHabits(true)           // все привычки
-    ]);
+    const { activeGoals, allHabits } = await loadStatsData();
 
     const activeGoalsCount = activeGoals.length;
     const totalHabitsCount = allHabits.length;
@@ -223,6 +239,53 @@ async function updateAllCounters() {
 
   } catch (error) {
     console.error('Ошибка обновления счётчиков:', error);
+  }
+}
+
+// Объединенная функция для обновления всех счетчиков одновременно (оптимизация)
+async function updateAllStats() {
+  try {
+    const { allGoals, activeGoals, allHabits } = await loadStatsData();
+    
+    // Вычисляем все значения один раз
+    const activeGoalsCount = activeGoals.length;
+    const allActiveGoalsCount = allGoals.filter(g => !g.completed && !g.archived).length;
+    const completedGoalsCount = allGoals.filter(g => g.completed).length;
+    const totalGoalsCount = allGoals.length;
+    const totalHabitsCount = allHabits.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const completedTodayCount = allHabits.filter(h => h.checkin_dates?.includes(today)).length;
+
+    // Обновляем dashboard stats
+    const activeGoalsEl = document.getElementById('active-goals-count');
+    if (activeGoalsEl) activeGoalsEl.textContent = allActiveGoalsCount;
+    const completedGoalsEl = document.getElementById('completed-goals-count');
+    if (completedGoalsEl) completedGoalsEl.textContent = completedGoalsCount;
+    const totalGoalsEl = document.getElementById('total-goals-count');
+    if (totalGoalsEl) totalGoalsEl.textContent = totalGoalsCount;
+    const totalHabitsEl = document.getElementById('total-habits-count');
+    if (totalHabitsEl) totalHabitsEl.textContent = totalHabitsCount;
+    const completedTodayEl = document.getElementById('completed-today-count');
+    if (completedTodayEl) completedTodayEl.textContent = completedTodayCount;
+
+    // Обновляем sidebar counters
+    document.querySelectorAll('.goals-counter').forEach(el => {
+      el.textContent = activeGoalsCount;
+    });
+    document.querySelectorAll('.habits-counter').forEach(el => {
+      el.textContent = `${completedTodayCount}/${totalHabitsCount}`;
+    });
+
+    console.log('📊 Вся статистика обновлена', { 
+      active: allActiveGoalsCount, 
+      completed: completedGoalsCount, 
+      totalGoals: totalGoalsCount, 
+      totalHabits: totalHabitsCount, 
+      completedToday: completedTodayCount 
+    });
+
+  } catch (error) {
+    console.error('Ошибка обновления статистики:', error);
   }
 }
 
@@ -281,6 +344,12 @@ async function updateTodayTasks() {
       progressBar.style.width = `${progressPercent}%`;
     }
     
+    // Удаляем старый обработчик перед обновлением HTML
+    if (todayTasksClickHandler) {
+      tasksList.removeEventListener('click', todayTasksClickHandler);
+      todayTasksClickHandler = null;
+    }
+    
     tasksList.innerHTML = todayTasks.map(task => `
       <div class="today-task-item" data-task-id="${task.id}">
         <button class="today-task-checkbox ${task.completed ? 'checked' : ''}" 
@@ -295,9 +364,8 @@ async function updateTodayTasks() {
       </div>
     `).join('');
     
-    // ИСПРАВЛЕННЫЙ ОБРАБОТЧИК - используем существующий метод toggleTodayHabit
-  
-    tasksList.addEventListener('click', async (e) => {
+    // Создаем новый обработчик и сохраняем ссылку
+    todayTasksClickHandler = async (e) => {
       const checkbox = e.target.closest('.today-task-checkbox');
       if (!checkbox) return;
       
@@ -330,16 +398,11 @@ async function updateTodayTasks() {
           progressBar.style.width = `${progressPercent}%`;
         }
         
-        // ВАЖНО: Обновляем счетчик в сайдбаре СРАЗУ
-        updateAllCounters();
-        
         // Выполняем API запрос
         await Habits.toggleTodayHabit(habitId, habitTitle, isCompleted);
         
-        // Обновляем всю статистику через 500мс
-        setTimeout(() => {
-          updateDashboardStats(); // Эта функция пересчитает все правильно
-        }, 500);
+        // Обновляем все счетчики одним запросом (оптимизация)
+        await updateAllStats();
         
       } catch (error) {
         console.error('Ошибка переключения привычки:', error);
@@ -356,7 +419,10 @@ async function updateTodayTasks() {
           meta.textContent = `Привычка • ${isCompleted ? 'Выполнено' : 'Не выполнено'}`;
         }
       }
-    });
+    };
+    
+    // Добавляем новый обработчик
+    tasksList.addEventListener('click', todayTasksClickHandler);
     
   } catch (error) {
     console.error('Ошибка загрузки задач:', error);
@@ -368,13 +434,23 @@ async function updateTodayTasks() {
   }
 }
 
+// Храним ссылки на обработчики для предотвращения дублирования
+let aiChatSendHandler = null;
+let aiChatKeydownHandler = null;
+
 function attachAIChatListeners() {
+  // Предотвращаем дублирование обработчиков
+  if (aiChatListenersAttached) {
+    return;
+  }
+  
   // Главная кнопка отправки
   const sendBtn = document.getElementById('ai-send-btn');
   const inputField = document.getElementById('ai-main-input');
   
   if (sendBtn && inputField) {
-    const sendHandler = async () => {
+    // Создаем обработчик отправки
+    aiChatSendHandler = async () => {
       const text = inputField.value.trim();
       if (!text) {
         UI.showToast('Введите запрос', 'warning');
@@ -400,40 +476,68 @@ function attachAIChatListeners() {
       }
     };
     
-    sendBtn.addEventListener('click', sendHandler);
+    sendBtn.addEventListener('click', aiChatSendHandler);
     
-    inputField.addEventListener('keydown', (e) => {
+    // Создаем обработчик клавиатуры
+    aiChatKeydownHandler = (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        sendHandler();
+        aiChatSendHandler();
       }
-    });
+    };
+    
+    inputField.addEventListener('keydown', aiChatKeydownHandler);
   }
   
-  // Быстрые кнопки
-  document.querySelectorAll('.quick-action-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const action = btn.dataset.action;
-      switch (action) {
-        case 'goals': showPage('goals'); break;
-        case 'habits': showPage('habits-tracker'); break;
-        case 'analytics': showPage('habits-list'); break;
-        case 'settings': showPage('habits-list'); break; // временно
-      }
-    });
+  // Быстрые кнопки - используем делегирование событий на родительском элементе
+  // Это предотвращает дублирование при повторных вызовах
+  const quickActionsContainer = document.querySelector('.quick-actions') || document.body;
+  quickActionsContainer.addEventListener('click', (e) => {
+    const btn = e.target.closest('.quick-action-btn');
+    if (!btn) return;
+    
+    const action = btn.dataset.action;
+    switch (action) {
+      case 'goals': showPage('goals'); break;
+      case 'habits': showPage('habits-tracker'); break;
+      case 'analytics': showPage('habits-list'); break;
+      case 'settings': showPage('habits-list'); break; // временно
+    }
   });
   
-  // Подсказки
-  setTimeout(() => {
-    document.querySelectorAll('.hint-item').forEach(hint => {
-      hint.addEventListener('click', () => {
-        if (inputField) {
-          inputField.value = hint.textContent;
-          inputField.focus();
-        }
-      });
-    });
-  }, 100);
+  // Подсказки - используем делегирование событий
+  const hintsContainer = document.querySelector('.hints-container') || document.body;
+  hintsContainer.addEventListener('click', (e) => {
+    const hint = e.target.closest('.hint-item');
+    if (!hint) return;
+    
+    const inputField = document.getElementById('ai-main-input');
+    if (inputField) {
+      inputField.value = hint.textContent;
+      inputField.focus();
+    }
+  });
+  
+  aiChatListenersAttached = true;
+}
+
+function detachAIChatListeners() {
+  if (!aiChatListenersAttached) return;
+  
+  const sendBtn = document.getElementById('ai-send-btn');
+  const inputField = document.getElementById('ai-main-input');
+  
+  if (sendBtn && aiChatSendHandler) {
+    sendBtn.removeEventListener('click', aiChatSendHandler);
+    aiChatSendHandler = null;
+  }
+  
+  if (inputField && aiChatKeydownHandler) {
+    inputField.removeEventListener('keydown', aiChatKeydownHandler);
+    aiChatKeydownHandler = null;
+  }
+  
+  aiChatListenersAttached = false;
 }
 
 // ==================== AI АНАЛИЗАТОР ====================
@@ -713,10 +817,7 @@ function showHelpModal() {
 }
 
 function showProfileModal() {
-  const user = Auth.getCurrentUser();
-  if (user) {
-    alert(`👤 ${user.name}\n📧 ${user.email}\n\nПрофиль в разработке...`);
-  }
+  showPage('profile');
 }
 
 function setTextContent(id, text) {
@@ -734,7 +835,8 @@ export {
   showPage, 
   showAuthScreen,
   updateUserUI,
-  updateDashboardStats
+  updateDashboardStats,
+  updateAllStats
 };
 
 // Глобальные функции
